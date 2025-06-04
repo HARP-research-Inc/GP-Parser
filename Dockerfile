@@ -132,5 +132,5 @@ RUN mkdir -p /usr/local/lib/python3.10/dist-packages/google_drive_downloader && 
 RUN python3 -m depccg en download
 
 # Health check to ensure everything is working
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python3 -c "import depccg, torch, cupy; print('All dependencies loaded successfully')" || exit 1
+#HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+#    CMD python3 -c "import depccg, torch, cupy; print('All dependencies loaded successfully')" || exit 1
