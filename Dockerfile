@@ -1,4 +1,4 @@
-FROM ubuntu:focal-20200729
+FROM ubuntu:20.04
 
 # Core stuff
 ENV DEBIAN_FRONTEND=noninteractive
@@ -12,8 +12,7 @@ RUN dpkg-reconfigure -f noninteractive tzdata
 RUN apt-get install -y wget curl gpg
 RUN apt-get install -y aptitude
 
-RUN apt-get install -y python3
-RUN apt-get install -y python3-pip
+RUN apt-get install -y python3 python3-pip
 
 # Install basic Python dependencies first
 RUN pip3 install "cython<3.0" numpy
@@ -22,7 +21,7 @@ RUN pip3 install "cython<3.0" numpy
 RUN pip3 install "pydantic<1.9" "typing-extensions<4.0"
 RUN pip3 install "spacy<3.2"
 # Install newer CUDA-enabled PyTorch that supports RTX 3050 Ti (sm_86)
-RUN pip3 install torch==1.13.1 torchvision==0.14.1 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cu117
+RUN pip3 install torch==1.13.1+cu117 torchvision==0.14.1+cu117 torchaudio==0.13.1+cu117 --extra-index-url https://download.pytorch.org/whl/cu117
 RUN pip3 install "transformers<4.21"
 RUN pip3 install scipy scikit-learn
 RUN pip3 install "allennlp<2.11"

@@ -79,7 +79,7 @@ class CCGTreeVisualizer:
             cmd = ['python3', '-m', 'depccg', self.lang]
             if self.model:
                 cmd.extend(['--model', self.model])
-            cmd.extend(['--input', temp_input, '--format', 'json'])
+            cmd.extend(['--input', temp_input, '--format', 'json', '--batchsize', '64', '--disable-beta', '--pruning-size', '50'])
 
             print(f"[Timer] Starting parse computation...")
             start_time = time.time()
