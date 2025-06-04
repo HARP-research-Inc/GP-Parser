@@ -1,0 +1,14 @@
+version: "3.8"
+
+services:
+  depccg:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: depccg_parser
+    tty: true
+    stdin_open: true
+    volumes:
+      - ./:/workspace
+      - ./src:/src
+    working_dir: /workspace
