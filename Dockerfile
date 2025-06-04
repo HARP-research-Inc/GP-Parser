@@ -21,7 +21,8 @@ RUN pip3 install "cython<3.0" numpy
 # Install heavy dependencies that depccg needs (most likely to be cached)
 RUN pip3 install "pydantic<1.9" "typing-extensions<4.0"
 RUN pip3 install "spacy<3.2"
-RUN pip3 install "torch<1.13.0"
+# Install newer CUDA-enabled PyTorch that supports RTX 3050 Ti (sm_86)
+RUN pip3 install torch==1.13.1 torchvision==0.14.1 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cu117
 RUN pip3 install "transformers<4.21"
 RUN pip3 install scipy scikit-learn
 RUN pip3 install "allennlp<2.11"
@@ -59,5 +60,5 @@ RUN tar -xzf en_hf_tri.tar.gz 2>/dev/null || echo "Failed to extract English mod
 RUN tar -xzf ja_headfinal.tar.gz 2>/dev/null || echo "Failed to extract Japanese model"
 
 # Alternative: Copy our working Python downloader and run it
-COPY download_models.py /tmp/download_models.py
-RUN python3 /tmp/download_models.py || echo "Python downloader failed, using existing models"
+# COPY download_models.py /tmp/download_models.py
+# RUN python3 /tmp/download_models.py || echo "Python downloader failed, using existing models"

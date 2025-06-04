@@ -1,11 +1,19 @@
 version: "3.8"
-
 services:
   depccg:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: depccg_parser
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    # OR use the older runtime syntax:
+    # runtime: nvidia
     tty: true
     stdin_open: true
     volumes:
