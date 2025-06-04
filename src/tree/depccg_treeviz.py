@@ -9,6 +9,7 @@ import subprocess
 import tempfile
 import os
 import json
+import time
 from typing import Dict, List, Tuple, Any, Optional
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -80,7 +81,12 @@ class CCGTreeVisualizer:
                 cmd.extend(['--model', self.model])
             cmd.extend(['--input', temp_input, '--format', 'json'])
 
+            print(f"[Timer] Starting parse computation...")
+            start_time = time.time()
             result = subprocess.run(cmd, capture_output=True, text=True)
+            end_time = time.time()
+            parse_duration = end_time - start_time
+            print(f"[Timer] Parse completed in {parse_duration:.3f} seconds")
 
             if result.returncode == 0 and result.stdout:
                 data = json.loads(result.stdout)
@@ -88,12 +94,14 @@ class CCGTreeVisualizer:
                     return {
                         'success': True,
                         'parse_data': data["1"][0],
+                        'parse_time': parse_duration,
                         'error': None
                     }
             
             return {
                 'success': False,
                 'parse_data': None,
+                'parse_time': parse_duration,
                 'error': result.stderr.strip() if result.stderr else "Parse failed"
             }
 
@@ -101,6 +109,7 @@ class CCGTreeVisualizer:
             return {
                 'success': False,
                 'parse_data': None,
+                'parse_time': 0.0,
                 'error': str(e)
             }
         finally:
@@ -177,7 +186,10 @@ class CCGTreeVisualizer:
         
         if not parse_result['success']:
             print(f"❌ Parse failed: {parse_result['error']}")
+            if 'parse_time' in parse_result:
+                print(f"⏱️  Parse time: {parse_result['parse_time']:.3f} seconds")
         else:
+            print(f"⏱️  Parse time: {parse_result['parse_time']:.3f} seconds")
             # Convert parse to graph
             G, root_id, labels, spans = self._dict_tree_to_graph(parse_result['parse_data'])
             
@@ -231,8 +243,8 @@ class CCGTreeVisualizer:
                                fontsize=10, fontweight='bold',
                                bbox=dict(boxstyle="round,pad=0.2", facecolor="lightblue", alpha=0.7))
                     else:
-                        # Non-terminal nodes (categories) - show category
-                        ax.text(x, y, label, ha='center', va='center', 
+                        # Non-terminal nodes (phrases) - show the actual phrase text
+                        ax.text(x, y, span, ha='center', va='center', 
                                fontsize=9,
                                bbox=dict(boxstyle="round,pad=0.2", facecolor="lightgreen", alpha=0.7))
             
