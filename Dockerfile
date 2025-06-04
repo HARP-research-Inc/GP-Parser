@@ -62,3 +62,5 @@ RUN tar -xzf ja_headfinal.tar.gz 2>/dev/null || echo "Failed to extract Japanese
 # Alternative: Copy our working Python downloader and run it
 # COPY download_models.py /tmp/download_models.py
 # RUN python3 /tmp/download_models.py || echo "Python downloader failed, using existing models"
+
+RUN pip install holoviews networkx pandas pyvis

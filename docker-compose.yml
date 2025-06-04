@@ -19,4 +19,5 @@ services:
     volumes:
       - ./:/workspace
       - ./src:/src
+      - ./output:/workspace/output
     working_dir: /workspace

@@ -50,9 +50,9 @@ def main():
     ]
     
     # Create parser instance
-    parser = DepCCGParser(model="elmo")
+    parser = DepCCGParser(model=None)  # Use default model instead of ELMo
     
-    print(f"Testing {len(test_sentences)} sentences with ELMo model:")
+    print(f"Testing {len(test_sentences)} sentences with default model:")
     print()
     
     # Parse each sentence

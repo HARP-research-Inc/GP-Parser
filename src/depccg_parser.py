@@ -15,12 +15,12 @@ from typing import Dict, List, Optional, Any
 class DepCCGParser:
     """Parser class for DepCCG with ELMo model."""
     
-    def __init__(self, model: str = "elmo", language: str = "en"):
+    def __init__(self, model: str = None, language: str = "en"):
         """
         Initialize the DepCCG parser.
         
         Args:
-            model: Model variant to use ("elmo" for ELMo model, None for default)
+            model: Model variant to use (None for default, "elmo" for ELMo model)
             language: Language code (default: "en")
         """
         self.model = model
@@ -134,12 +134,12 @@ class DepCCGParser:
             }
 
 def create_elmo_parser() -> DepCCGParser:
-    """Convenience function to create an ELMo parser."""
-    return DepCCGParser(model="elmo")
+    """Convenience function to create a default DepCCG parser."""
+    return DepCCGParser(model=None)
 
 def parse_with_elmo(sentence: str) -> Dict[str, Any]:
     """
-    Convenience function to parse a sentence with ELMo model.
+    Convenience function to parse a sentence with default model.
     
     Args:
         sentence: Sentence to parse
