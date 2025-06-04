@@ -4,14 +4,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: depccg_parser
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+    container_name: depccg_parser_cpu
     # OR use the older runtime syntax:
     # runtime: nvidia
     tty: true
