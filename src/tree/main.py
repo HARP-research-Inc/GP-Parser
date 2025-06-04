@@ -9,10 +9,11 @@ main.py – CCG tree visualizer with direct PNG output
 import argparse
 import sys
 import os
+import re
 
 from depccg_treeviz import CCGTreeVisualizer as DepCCG
-from easyccg_treeviz import EasyCCGTreeVisualizer as EasyCCG
-from spacy_benepar_treeviz import BeneparTreeVisualizer as Benepar
+#from easyccg_treeviz import EasyCCGTreeVisualizer as EasyCCG
+from spacy_treeviz import BeneparTreeVisualizer as Benepar
 
 
 def cli() -> argparse.Namespace:
@@ -30,21 +31,21 @@ def main():
 
     # instantiate each backend
     vis_dep   = DepCCG()
-    vis_easy  = EasyCCG()
+    #vis_easy  = EasyCCG()
     vis_bene  = Benepar()
 
     for sentence in sentences:
         # build 3 separate output filenames
         base = args.output or f"output_{sentence[:20].replace(' ','_')}"
         dep_out  = base + "_depccg.png"
-        easy_out = base + "_easyccg.png"
+        #easy_out = base + "_easyccg.png"
         ben_out  = base + "_benepar.png"
 
         print("\n=== DepCCG ===")
         vis_dep.save_tree_image(sentence, dep_out, width=args.width, height=args.height)
 
         print("\n=== EasyCCG ===")
-        vis_easy.save_tree_image(sentence, easy_out, width=args.width, height=args.height)
+        #vis_easy.save_tree_image(sentence, easy_out, width=args.width, height=args.height)
 
         print("\n=== Benepar ===")
         vis_bene.save_tree_image(sentence, ben_out, width=args.width, height=args.height)

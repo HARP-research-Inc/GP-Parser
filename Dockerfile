@@ -20,8 +20,6 @@ RUN pip3 install "cython<3.0" numpy
 # Install heavy dependencies that depccg needs (most likely to be cached)
 RUN pip3 install "pydantic<1.9" "typing-extensions<4.0"
 RUN pip3 install "spacy<3.2"
-# Install newer CUDA-enabled PyTorch that supports RTX 3050 Ti (sm_86)
-RUN pip3 install torch==1.13.1+cu117 torchvision==0.14.1+cu117 torchaudio==0.13.1+cu117 --extra-index-url https://download.pytorch.org/whl/cu117
 RUN pip3 install "transformers<4.21"
 RUN pip3 install scipy scikit-learn
 RUN pip3 install "allennlp<2.11"
@@ -66,3 +64,9 @@ RUN pip install holoviews networkx pandas pyvis
 
 RUN pip install matplotlib
 RUN python3 -m depccg en download
+
+RUN pip install benepar
+RUN python3 -c "import benepar; benepar.download('benepar_en3')"
+
+RUN pip install spacy networkx
+RUN python3 -m spacy download en_core_web_sm 

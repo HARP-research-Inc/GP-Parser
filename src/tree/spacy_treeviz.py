@@ -4,7 +4,7 @@ spacy_benepar_treeviz.py
 ------------------------
 Same interface as depccg_treeviz, but uses spaCy + Benepar
 (constituency) to build a phrase tree and converts it into
-the identical “subphrase‐only” dict‐tree.  The PNG output
+the identical "subphrase‐only" dict‐tree.  The PNG output
 follows exactly the same layout + styling.
 
 Dependencies:
@@ -51,7 +51,7 @@ def _convert_nltk_tree(nltk_node: Any) -> Dict[str, Any]:
 
 
 # --------------------------------------------------------------------
-#  The “drop-in” visualizer class using spaCy + Benepar
+#  The "drop-in" visualizer class using spaCy + Benepar
 # --------------------------------------------------------------------
 class BeneparTreeVisualizer:
     """Tree visualizer using spaCy + Benepar for direct image output."""
@@ -109,7 +109,7 @@ class BeneparTreeVisualizer:
 
     # …—————————————————————————————————————————————————————————————————
     # The methods below are identical to depccg_treeviz.py
-    # (block‐for‐block), except for “Benepar” in the banner.
+    # (block‐for‐block), except for "Benepar" in the banner.
     # ——————————————————————————————————————————————————————————————————
     def _flatten_leaves_from_dict(self, node: Dict[str, Any]) -> List[str]:
         if isinstance(node, dict):
@@ -156,11 +156,12 @@ class BeneparTreeVisualizer:
         self, tree_data: Dict[str, Any]
     ) -> Tuple[nx.DiGraph, int, Dict[int, str], Dict[int, str]]:
         spans: Dict[int, str] = {}
-        edges: List[Tuple[int, int]] = {}
+        edges: List[Tuple[int, int]] = []
         labels: Dict[int, str] = {}
         # note: no category storage—we only show spans
 
         def walk(node: Any, parent_id: Optional[int] = None) -> int:
+            nonlocal edges, spans, labels
             my_id = len(spans)
             if isinstance(node, dict) and "children" in node:
                 span_text = " ".join(self._flatten_leaves_from_dict(node)) or "ε"
