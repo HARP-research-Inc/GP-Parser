@@ -256,5 +256,48 @@ class CCGTreeVisualizer:
         plt.close()
         
         print(f"💾 Saved image: {output_path}")
+        
+        # Return the parse data for JSON output
+        return {
+            'sentence': sentence,
+            'parser': 'depccg',
+            'success': parse_result['success'],
+            'parse_time': parse_result.get('parse_time', 0.0),
+            'parse_data': parse_result['parse_data'] if parse_result['success'] else None,
+            'error': parse_result.get('error', None)
+        }
+
+    def parse_only(self, sentence: str):
+        """Parse sentence and return data without saving files."""
+        print(f"[depccg_treeviz] Parsing: {sentence}")
+        
+        parse_result = self._parse_sentence(sentence)
+        
+        if not parse_result['success']:
+            print(f"❌ Parse failed: {parse_result['error']}")
+            if 'parse_time' in parse_result:
+                print(f"⏱️  Parse time: {parse_result['parse_time']:.3f} seconds")
+        else:
+            print(f"⏱️  Parse time: {parse_result['parse_time']:.3f} seconds")
+            # Convert parse to graph
+            G, root_id, labels, spans = self._dict_tree_to_graph(parse_result['parse_data'])
+            
+            if not G.nodes():
+                print("❌ No tree structure found")
+            else:
+                print("🌳 Parse tree structure:")
+                print("=" * 50)
+                self._print_tree(G, root_id, labels, spans)
+                print("=" * 50)
+        
+        # Return the parse data
+        return {
+            'sentence': sentence,
+            'parser': 'depccg',
+            'success': parse_result['success'],
+            'parse_time': parse_result.get('parse_time', 0.0),
+            'parse_data': parse_result['parse_data'] if parse_result['success'] else None,
+            'error': parse_result.get('error', None)
+        }
 
 print("[depccg_treeviz] Using matplotlib for direct image output")

@@ -154,23 +154,66 @@ class BeneparTreeVisualizer:
 
     def _dict_tree_to_graph(
         self, tree_data: Dict[str, Any]
-    ) -> Tuple[nx.DiGraph, int, Dict[int, str], Dict[int, str]]:
+    ) -> Tuple[nx.DiGraph, int, Dict[int, str], Dict[int, str], Dict[int, str]]:
         spans: Dict[int, str] = {}
         edges: List[Tuple[int, int]] = []
         labels: Dict[int, str] = {}
-        # note: no category storage—we only show spans
+        categories: Dict[int, str] = {}  # Store syntactic categories
+        next_id = [0]  # Use list to make it mutable in nested function
 
         def walk(node: Any, parent_id: Optional[int] = None) -> int:
-            nonlocal edges, spans, labels
-            my_id = len(spans)
+            nonlocal edges, spans, labels, categories
+            my_id = next_id[0]
+            next_id[0] += 1
+            
             if isinstance(node, dict) and "children" in node:
                 span_text = " ".join(self._flatten_leaves_from_dict(node)) or "ε"
+                category = node.get("cat", "")
                 spans[my_id] = span_text
                 labels[my_id] = span_text
+                categories[my_id] = category
+                
+                # Process children first
+                child_ids = []
+                for ch in node["children"]:
+                    child_id = walk(ch, None)  # Don't connect to parent yet
+                    child_ids.append(child_id)
+                
+                # Be more aggressive with collapsing - collapse if:
+                # 1. Single child AND
+                # 2. Same span text (redundant)
+                # This handles both empty categories and POS tag → word redundancy
+                should_collapse = (
+                    len(child_ids) == 1 and
+                    span_text == spans.get(child_ids[0], "")
+                )
+                
+                if should_collapse:
+                    child_id = child_ids[0]
+                    # This node is redundant - return the child instead
+                    # But preserve the category info in the child's label if it's meaningful
+                    if category and category not in ["ROOT", "TOP", "S1"]:
+                        # Update the child to show the POS tag
+                        child_span = spans[child_id]
+                        spans[child_id] = child_span  # Keep original span
+                        labels[child_id] = f"{child_span} [{category}]"  # Add POS tag to label
+                        categories[child_id] = category  # Preserve category
+                    
+                    # Remove this redundant node
+                    del spans[my_id]
+                    del labels[my_id]
+                    del categories[my_id]
+                    # Connect parent directly to child
+                    if parent_id is not None:
+                        edges.append((parent_id, child_id))
+                    return child_id
+                
+                # Normal case - connect parent to this node and this node to children
                 if parent_id is not None:
                     edges.append((parent_id, my_id))
-                for ch in node["children"]:
-                    walk(ch, my_id)
+                for child_id in child_ids:
+                    edges.append((my_id, child_id))
+                        
             else:
                 if isinstance(node, dict) and "word" in node:
                     w = node["word"]
@@ -178,6 +221,7 @@ class BeneparTreeVisualizer:
                     w = str(node)
                 spans[my_id] = w
                 labels[my_id] = w
+                categories[my_id] = ""  # Leaves have no category
                 if parent_id is not None:
                     edges.append((parent_id, my_id))
             return my_id
@@ -186,7 +230,7 @@ class BeneparTreeVisualizer:
         G = nx.DiGraph()
         G.add_nodes_from(spans.keys())
         G.add_edges_from(edges)
-        return G, root_id, labels, spans
+        return G, root_id, labels, spans, categories
 
     def _print_tree(
         self,
@@ -194,6 +238,7 @@ class BeneparTreeVisualizer:
         root_id: int,
         labels: Dict[int, str],
         spans: Dict[int, str],
+        categories: Dict[int, str],
         indent: str = "",
         is_last: bool = True,
     ):
@@ -201,19 +246,28 @@ class BeneparTreeVisualizer:
             return
 
         span = spans[root_id]
+        category = categories[root_id]
         children = list(G.successors(root_id))
         is_leaf = len(children) == 0
         branch = "└── " if is_last else "├── "
 
         if is_leaf:
-            print(f"{indent}{branch}{span}")
+            # For leaves, show word with POS tag if available
+            if category and category not in ["ROOT", "TOP", "S1", ""]:
+                print(f"{indent}{branch}{span} [{category}]")
+            else:
+                print(f"{indent}{branch}{span}")
         else:
-            print(f"{indent}{branch}{span}")
+            # For internal nodes, show category and span like DepCCG
+            if category:
+                print(f"{indent}{branch}{category} → '{span}'")
+            else:
+                print(f"{indent}{branch}{span}")
 
         for i, ch in enumerate(children):
             last = i == len(children) - 1
             nxt_indent = indent + ("    " if is_last else "│   ")
-            self._print_tree(G, ch, labels, spans, nxt_indent, last)
+            self._print_tree(G, ch, labels, spans, categories, nxt_indent, last)
 
     def save_tree_image(
         self, sentence: str, output_path: str, width: int = 12, height: int = 8
@@ -226,13 +280,13 @@ class BeneparTreeVisualizer:
             print(f"⏱️  Parse time: {parse_result['parse_time']:.3f} seconds")
         else:
             print(f"⏱️  Parse time: {parse_result['parse_time']:.3f} seconds")
-            G, root_id, labels, spans = self._dict_tree_to_graph(parse_result["parse_data"])
+            G, root_id, labels, spans, categories = self._dict_tree_to_graph(parse_result["parse_data"])
             if G.number_of_nodes() == 0:
                 print("❌ No tree structure found")
             else:
                 print("🌳 Parse tree structure:")
                 print("=" * 50)
-                self._print_tree(G, root_id, labels, spans)
+                self._print_tree(G, root_id, labels, spans, categories)
                 print("=" * 50)
 
         # Draw identical PNG style
@@ -284,3 +338,42 @@ class BeneparTreeVisualizer:
         fig.savefig(output_path, dpi=300, bbox_inches="tight", facecolor="white")
         plt.close(fig)
         print(f"💾 Saved image: {output_path}")
+        
+        # Return the parse data for JSON output  
+        return {
+            'sentence': sentence,
+            'parser': 'benepar',
+            'success': parse_result['success'],
+            'parse_time': parse_result.get('parse_time', 0.0),
+            'parse_data': parse_result['parse_data'] if parse_result['success'] else None,
+            'error': parse_result.get('error', None)
+        }
+
+    def parse_only(self, sentence: str):
+        """Parse sentence and return data without saving files."""
+        print(f"[benepar_treeviz] Parsing: {sentence}")
+        parse_result = self._parse_sentence(sentence)
+
+        if not parse_result["success"]:
+            print(f"❌ Parse failed: {parse_result['error']}")
+            print(f"⏱️  Parse time: {parse_result['parse_time']:.3f} seconds")
+        else:
+            print(f"⏱️  Parse time: {parse_result['parse_time']:.3f} seconds")
+            G, root_id, labels, spans, categories = self._dict_tree_to_graph(parse_result["parse_data"])
+            if G.number_of_nodes() == 0:
+                print("❌ No tree structure found")
+            else:
+                print("🌳 Parse tree structure:")
+                print("=" * 50)
+                self._print_tree(G, root_id, labels, spans, categories)
+                print("=" * 50)
+
+        # Return the parse data
+        return {
+            'sentence': sentence,
+            'parser': 'benepar',
+            'success': parse_result['success'],
+            'parse_time': parse_result.get('parse_time', 0.0),
+            'parse_data': parse_result['parse_data'] if parse_result['success'] else None,
+            'error': parse_result.get('error', None)
+        }
