@@ -1,41 +1,33 @@
 #!/usr/bin/env python3
 """
-DepCCG Tree Visualizer - Works with current DepCCG versions
+DepCCG Tree Visualizer - Direct image output using matplotlib
 
-Uses subprocess calls to depccg (like the working parser module) instead of 
-trying to import non-existent API classes.
+Uses subprocess calls to depccg and matplotlib for direct PNG generation.
 """
 
 import subprocess
 import tempfile
 import os
 import json
-from typing import Dict, List, Tuple, Any
-from pathlib import Path
-import importlib.util
-
+from typing import Dict, List, Tuple, Any, Optional
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+from matplotlib.patches import FancyBboxPatch
 import networkx as nx
-import holoviews as hv
 
-# Activate bokeh backend
-hv.extension("bokeh")
-
-# -------------------------------------------------------------------- 
+# --------------------------------------------------------------------
 # Helper functions
 # --------------------------------------------------------------------
 def _flatten_leaves_from_dict(node: Dict[str, Any]) -> List[str]:
     """Extract leaf tokens from a tree dictionary structure."""
     if isinstance(node, dict):
-        # If this is a leaf node with a word
         if 'word' in node:
             return [node['word']]
-        # If it has children, recurse
         if 'children' in node and node['children']:
             words = []
             for child in node['children']:
                 words.extend(_flatten_leaves_from_dict(child))
             return words
-    # If it's a string (sometimes leaves are just strings)
     elif isinstance(node, str):
         return [node]
     return []
@@ -47,7 +39,7 @@ def _hierarchy_pos(
     vert_gap: float = 0.25,
     y0: float = 0.0,
 ) -> Dict[int, Tuple[float, float]]:
-    """Classic recursive tree layout (top-down)."""
+    """Calculate hierarchical positions for tree layout."""
     if root not in G:
         return {root: (0.5, y0)}
 
@@ -70,50 +62,24 @@ def _hierarchy_pos(
 # Main visualizer class  
 # --------------------------------------------------------------------
 class CCGTreeVisualizer:
-    """
-    Tree visualizer that uses subprocess calls to DepCCG.
-    """
+    """Tree visualizer using matplotlib for direct image output."""
 
-    def __init__(
-        self,
-        *,
-        lang: str = "en",
-        model: str = None,
-        beam_size: int = 1,
-        nbest: int = 1,
-        max_sent_len: int = 200,
-    ) -> None:
-        """
-        Initialize the visualizer.
-        
-        Args:
-            lang: Language code (default: "en")
-            model: Model variant (None for default, "elmo" for ELMo)
-            beam_size: Beam size for parsing
-            nbest: Number of best parses to return
-            max_sent_len: Maximum sentence length
-        """
+    def __init__(self, lang: str = "en", model: str = None):
         self.lang = lang
         self.model = model
-        self.beam_size = beam_size
-        self.nbest = nbest
-        self.max_sent_len = max_sent_len
 
     def _parse_sentence(self, sentence: str) -> Dict[str, Any]:
         """Parse a sentence using subprocess call to depccg."""
-        # Create temporary file
         with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
             f.write(sentence.strip() + '\n')
             temp_input = f.name
 
         try:
-            # Build command
             cmd = ['python3', '-m', 'depccg', self.lang]
             if self.model:
                 cmd.extend(['--model', self.model])
             cmd.extend(['--input', temp_input, '--format', 'json'])
 
-            # Run parser
             result = subprocess.run(cmd, capture_output=True, text=True)
 
             if result.returncode == 0 and result.stdout:
@@ -141,119 +107,142 @@ class CCGTreeVisualizer:
             if os.path.exists(temp_input):
                 os.unlink(temp_input)
 
-    def _dict_tree_to_graph(self, tree_data: Dict[str, Any]) -> Tuple[nx.DiGraph, int]:
-        """Convert dictionary tree structure to NetworkX graph."""
+    def _dict_tree_to_graph(self, tree_data: Dict[str, Any]) \
+            -> Tuple[nx.DiGraph, int, Dict[int, str], Dict[int, str]]:
+
         spans: Dict[int, str] = {}
         edges: List[Tuple[int, int]] = []
         labels: Dict[int, str] = {}
+        categories: Dict[int, str] = {}
 
-        def walk(node: Any, parent_id: int = None) -> int:
-            """Walk the tree structure and assign IDs."""
+        def walk(node: Any, parent_id: Optional[int] = None) -> int:
             my_id = len(spans)
-            
-            # Extract text and label information
+
             if isinstance(node, dict):
-                # Get the span text from flattened leaves
                 span_text = " ".join(_flatten_leaves_from_dict(node)) or "ε"
-                
-                # Get category/label if available
-                label = node.get('cat', node.get('category', node.get('label', span_text)))
-                
-                spans[my_id] = span_text
-                labels[my_id] = f"{label}\\n{span_text}" if label != span_text else span_text
-                
-                # Add edge from parent
+                cat       = node.get("cat", "")
+                spans[my_id]       = span_text
+                categories[my_id]  = cat
+                labels[my_id]      = cat or span_text
                 if parent_id is not None:
                     edges.append((parent_id, my_id))
-                
-                # Process children
-                children = node.get('children', [])
-                if children:
-                    for child in children:
-                        walk(child, my_id)
-                        
-            elif isinstance(node, str):
-                # Leaf node that's just a string
-                spans[my_id] = node
-                labels[my_id] = node
+                for child in node.get("children", []):
+                    walk(child, my_id)
+            else:                                  # raw string leaf
+                spans[my_id]  = str(node)
+                labels[my_id] = str(node)
+                categories[my_id] = ""
                 if parent_id is not None:
                     edges.append((parent_id, my_id))
-            
             return my_id
 
-        # Start walking from the tree data
-        if 'tree' in tree_data:
-            root_id = walk(tree_data['tree'])
-        elif 'deriv' in tree_data:
-            root_id = walk(tree_data['deriv'])
-        else:
-            # Fallback: create a simple node with available info
-            root_id = 0
-            spans[0] = str(tree_data)
-            labels[0] = str(tree_data)
+        root_id = walk(tree_data)          # <-- walk unconditionally
 
-        # Create graph
         G = nx.DiGraph()
-        for i in spans:
-            G.add_node(i, label=labels.get(i, spans[i]), span=spans[i])
+        G.add_nodes_from(spans.keys())
         G.add_edges_from(edges)
+        return G, root_id, labels, spans
+
+    def _print_tree(self, G: nx.DiGraph, root_id: int, labels: Dict[int, str], spans: Dict[int, str], indent: str = "", is_last: bool = True):
+        """Print tree structure to console."""
+        if root_id not in G:
+            return
+            
+        # Print current node
+        label = labels.get(root_id, str(root_id))
+        span = spans.get(root_id, "")
         
-        return G, root_id
+        # Determine if this is a leaf
+        children = list(G.successors(root_id))
+        is_leaf = len(children) == 0
+        
+        # Print node with tree structure
+        branch = "└── " if is_last else "├── "
+        if is_leaf:
+            print(f"{indent}{branch}{span} [{label}]")
+        else:
+            print(f"{indent}{branch}{label} → '{span}'")
+        
+        # Print children
+        for i, child_id in enumerate(children):
+            child_is_last = (i == len(children) - 1)
+            next_indent = indent + ("    " if is_last else "│   ")
+            self._print_tree(G, child_id, labels, spans, next_indent, child_is_last)
 
-    def visualize(self, sentence: str) -> hv.Graph:
-        """
-        Parse sentence and return HoloViews Graph visualization.
-        """
-        try:
-            parse_result = self._parse_sentence(sentence)
-            
-            if not parse_result['success']:
-                # Create fallback graph
-                G = nx.DiGraph()
-                G.add_node(0, label=f"Parse failed:\\n{sentence}", span=sentence)
-                layout = {0: (0.5, 0.5)}
-                hv_graph = hv.Graph.from_networkx(G, layout)
-                return hv_graph.opts(
-                    node_size=20, 
-                    tools=["hover"],
-                    bgcolor="lightgray"
-                )
-
+    def save_tree_image(self, sentence: str, output_path: str, width: int = 12, height: int = 8):
+        """Parse sentence and save tree visualization as PNG."""
+        print(f"[depccg_treeviz] Parsing: {sentence}")
+        
+        parse_result = self._parse_sentence(sentence)
+        
+        if not parse_result['success']:
+            print(f"❌ Parse failed: {parse_result['error']}")
+        else:
             # Convert parse to graph
-            G, root_id = self._dict_tree_to_graph(parse_result['parse_data'])
+            G, root_id, labels, spans = self._dict_tree_to_graph(parse_result['parse_data'])
             
-            # Create layout
-            layout = _hierarchy_pos(G, root_id, width=1.0, vert_gap=0.3)
-
-            # Create HoloViews graph
-            hv_graph = hv.Graph.from_networkx(G, layout)
+            if not G.nodes():
+                print("❌ No tree structure found")
+            else:
+                print("🌳 Parse tree structure:")
+                print("=" * 50)
+                self._print_tree(G, root_id, labels, spans)
+                print("=" * 50)
+        
+        # Now create the image
+        fig, ax = plt.subplots(figsize=(width, height))
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.axis('off')
+        
+        if not parse_result['success']:
+            # Draw error message
+            ax.text(0.5, 0.5, f"Parse failed: {sentence}\nError: {parse_result['error']}", 
+                   ha='center', va='center', fontsize=12, color='red',
+                   bbox=dict(boxstyle="round,pad=0.3", facecolor="lightgray"))
+            plt.title("Parse Failed", fontsize=16, color='red')
+        else:
+            # Draw successful parse tree (reuse the same graph we built for printing)
+            if not G.nodes():
+                ax.text(0.5, 0.5, "No tree structure found", ha='center', va='center')
+            else:
+                # Calculate positions
+                pos = _hierarchy_pos(G, root_id, width=0.9, vert_gap=0.15, y0=0.9)
+                
+                # Draw edges
+                for edge in G.edges():
+                    start_pos = pos[edge[0]]
+                    end_pos = pos[edge[1]]
+                    ax.plot([start_pos[0], end_pos[0]], [start_pos[1], end_pos[1]], 
+                           'k-', linewidth=1.5, alpha=0.7)
+                
+                # Draw nodes
+                for node_id in G.nodes():
+                    x, y = pos[node_id]
+                    label = labels.get(node_id, str(node_id))
+                    span = spans.get(node_id, "")
+                    
+                    # Determine if this is a leaf (terminal) node
+                    is_leaf = len(list(G.successors(node_id))) == 0
+                    
+                    if is_leaf:
+                        # Terminal nodes (words) - simple text
+                        ax.text(x, y, span, ha='center', va='center', 
+                               fontsize=10, fontweight='bold',
+                               bbox=dict(boxstyle="round,pad=0.2", facecolor="lightblue", alpha=0.7))
+                    else:
+                        # Non-terminal nodes (categories) - show category
+                        ax.text(x, y, label, ha='center', va='center', 
+                               fontsize=9,
+                               bbox=dict(boxstyle="round,pad=0.2", facecolor="lightgreen", alpha=0.7))
             
-            # Apply styling
-            hv_graph = hv_graph.opts(
-                node_size=15,
-                node_color="white",
-                node_line_color="black",
-                edge_line_width=1.5,
-                tools=["hover", "box_zoom", "reset"],
-                xaxis=None,
-                yaxis=None,
-                bgcolor="white",
-                width=800,
-                height=600
-            )
-            
-            return hv_graph
+            plt.title(f"CCG Parse: {sentence}", fontsize=14, pad=20)
+        
+        # Remove tight_layout to avoid the warning
+        plt.subplots_adjust(top=0.85)
+        plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
+        plt.close()
+        
+        print(f"💾 Saved image: {output_path}")
 
-        except Exception as e:
-            # Create error graph
-            G = nx.DiGraph()
-            G.add_node(0, label=f"Error: {str(e)}\\n{sentence}", span=sentence)
-            layout = {0: (0.5, 0.5)}
-            hv_graph = hv.Graph.from_networkx(G, layout)
-            return hv_graph.opts(
-                node_size=20,
-                tools=["hover"],
-                bgcolor="lightgray"
-            )
-
-print("[depccg_treeviz] Using subprocess approach (compatible with current DepCCG)")
+print("[depccg_treeviz] Using matplotlib for direct image output")

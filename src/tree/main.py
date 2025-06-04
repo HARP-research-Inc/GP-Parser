@@ -1,18 +1,14 @@
 #!/usr/bin/env python3
 """
-main.py – quick driver for depccg_treeviz.
+main.py – CCG tree visualizer with direct PNG output
 
     python main.py "I placed my red hat in Johnny's hand"
-    python main.py -o tree.html "The fox jumped over the dog"
+    python main.py -o tree.png "The fox jumped over the dog"
 """
 
 import argparse
 import sys
-import webbrowser
-from tempfile import NamedTemporaryFile
-
-import holoviews as hv
-hv.extension('bokeh')
+import os
 
 from depccg_treeviz import CCGTreeVisualizer
 
@@ -20,7 +16,9 @@ from depccg_treeviz import CCGTreeVisualizer
 def cli() -> argparse.Namespace:
     p = argparse.ArgumentParser()
     p.add_argument("sentence", nargs="*", help="Sentence (if empty, read stdin).")
-    p.add_argument("-o", "--output", help="Write HTML instead of auto-opening.")
+    p.add_argument("-o", "--output", help="Output PNG file path.")
+    p.add_argument("--width", type=int, default=12, help="Image width in inches (default: 12)")
+    p.add_argument("--height", type=int, default=8, help="Image height in inches (default: 8)")
     return p.parse_args()
 
 
@@ -36,39 +34,29 @@ def main() -> None:
     
     vis = CCGTreeVisualizer()
     
-    # Create visualizations
-    hv_objs = []
-    for sentence in sentences:
-        try:
-            graph = vis.visualize(sentence)
-            # Add title to each graph
-            titled_graph = graph.opts(title=sentence[:50] + "..." if len(sentence) > 50 else sentence)
-            hv_objs.append(titled_graph)
-        except Exception as e:
-            print(f"Error visualizing '{sentence}': {e}")
-            continue
-    
-    if not hv_objs:
-        print("No successful visualizations generated.")
-        return
-    
-    # Create layout
-    if len(hv_objs) == 1:
-        layout = hv_objs[0]
-    else:
-        layout = hv.Layout(hv_objs).cols(1)
-
-    # Save to file
-    if args.output:
-        hv.save(layout, args.output)
-        print(f"wrote {args.output}")
-    else:
-        # Save to temporary file and open
-        tmp = NamedTemporaryFile(delete=False, suffix=".html")
-        tmp.close()
-        hv.save(layout, tmp.name)
-        webbrowser.open(f"file://{tmp.name}")
-        print(f"Opened visualization in browser: {tmp.name}")
+    for i, sentence in enumerate(sentences):
+        # Determine output path
+        if args.output:
+            if len(sentences) == 1:
+                output_path = args.output
+                # Force PNG extension
+                if not output_path.lower().endswith('.png'):
+                    output_path = os.path.splitext(output_path)[0] + '.png'
+            else:
+                # Multiple sentences: add index
+                base, ext = os.path.splitext(args.output)
+                output_path = f"{base}_{i+1}.png"
+        else:
+            # Auto-generate filename
+            safe_sentence = "".join(c for c in sentence if c.isalnum() or c in (' ', '-', '_')).rstrip()
+            safe_sentence = safe_sentence[:50].replace(' ', '_')
+            output_path = f"/workspace/output/syntax_tree_{safe_sentence}.png"
+        
+        # Make sure output directory exists
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        
+        # Generate and save the tree image
+        vis.save_tree_image(sentence, output_path, width=args.width, height=args.height)
 
 
 if __name__ == "__main__":

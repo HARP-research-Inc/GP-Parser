@@ -64,3 +64,6 @@ RUN tar -xzf ja_headfinal.tar.gz 2>/dev/null || echo "Failed to extract Japanese
 # RUN python3 /tmp/download_models.py || echo "Python downloader failed, using existing models"
 
 RUN pip install holoviews networkx pandas pyvis
+
+RUN pip install matplotlib
+RUN python3 -m depccg en download
