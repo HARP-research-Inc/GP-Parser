@@ -7,12 +7,27 @@ for direct structural comparison, ignoring linguistic category differences.
 
 The goal is to test whether parsers produce equivalent hierarchical structures
 regardless of their different category systems (CCG vs constituency).
+
+Features multiprocessing support for faster processing of large sentence sets.
+
+Usage Examples:
+    # Basic usage with auto-detected cores
+    python tree_structure_comparison.py --sentences "The cat sleeps." "She reads books."
+    
+    # Use specific number of cores
+    python tree_structure_comparison.py --cores 4 --sentences "Hello world." "How are you?"
+    
+    # Process quietly and save results
+    python tree_structure_comparison.py --quiet --save-results results.json --sentences "Test sentence."
 """
 
 import argparse
 from typing import Dict, List, Any, Tuple, Optional
 import json
 import re
+import multiprocessing as mp
+import time
+from functools import partial
 
 from depccg_treeviz import CCGTreeVisualizer as DepCCG
 from spacy_treeviz import BeneparTreeVisualizer as Benepar
@@ -248,16 +263,72 @@ def compare_tree_structures(tree1: StandardTree, tree2: StandardTree) -> Dict[st
     return comparison
 
 
-def run_structure_comparison_test(sentences: List[str], verbose: bool = True) -> Dict[str, Any]:
-    """Run structure comparison test on multiple sentences."""
-    print(f"🔬 Starting tree structure comparison on {len(sentences)} sentences...")
+def process_single_sentence(sentence_data: Tuple[int, str, bool]) -> Optional[Dict[str, Any]]:
+    """Process a single sentence in a worker process.
     
+    Args:
+        sentence_data: Tuple of (index, sentence, verbose)
+    
+    Returns:
+        Dict with comparison results or None if parsing failed
+    """
+    index, sentence, verbose = sentence_data
+    
+    # Create parser instances in each worker process
     dep_parser = DepCCG()
     ben_parser = Benepar()
     assessor = ParsingAccuracyAssessor()
     
+    if verbose:
+        print(f"📝 Worker processing {index}: {sentence}")
+    
+    # Parse with both systems
+    dep_result = dep_parser.parse_only(sentence)
+    ben_result = ben_parser.parse_only(sentence)
+    
+    if not (dep_result.get('success') and ben_result.get('success')):
+        if verbose:
+            print(f"❌ Worker {index}: One or both parsers failed - skipping comparison")
+        return None
+    
+    # Convert to standard trees
+    dep_tree = depccg_to_standard_tree(dep_result['parse_data'])
+    ben_tree = benepar_to_standard_tree(ben_result['parse_data'])
+    
+    # Compare structures
+    comparison = compare_tree_structures(dep_tree, ben_tree)
+    
+    # Assess parsing quality
+    quality_comparison = assessor.compare_parsing_quality(dep_tree, ben_tree)
+    comparison['quality_assessment'] = quality_comparison
+    comparison['sentence'] = sentence
+    comparison['index'] = index
+    
+    if verbose:
+        print(f"✅ Worker {index}: Completed parsing and comparison")
+    
+    return comparison
+
+
+def run_structure_comparison_test(sentences: List[str], verbose: bool = True, num_cores: int = None) -> Dict[str, Any]:
+    """Run structure comparison test on multiple sentences with multiprocessing.
+    
+    Args:
+        sentences: List of sentences to process
+        verbose: Whether to show detailed progress
+        num_cores: Number of CPU cores to use (None = auto-detect)
+    """
+    if num_cores is None:
+        num_cores = mp.cpu_count()
+    
+    print(f"🔬 Starting tree structure comparison on {len(sentences)} sentences using {num_cores} cores...")
+    start_time = time.time()
+    
     results = {
         "total_sentences": len(sentences),
+        "cores_used": num_cores,
+        "processing_time": 0.0,
+        "sentences_per_second": 0.0,
         "identical_structures": 0,
         "identical_leaves": 0,
         "identical_depths": 0,
@@ -268,31 +339,27 @@ def run_structure_comparison_test(sentences: List[str], verbose: bool = True) ->
         "detailed_results": []
     }
     
-    for i, sentence in enumerate(sentences, 1):
-        if verbose:
-            print(f"\n📝 Testing {i}/{len(sentences)}: {sentence}")
-        
-        # Parse with both systems
-        dep_result = dep_parser.parse_only(sentence)
-        ben_result = ben_parser.parse_only(sentence)
-        
-        if not (dep_result.get('success') and ben_result.get('success')):
-            if verbose:
-                print("❌ One or both parsers failed - skipping comparison")
-            continue
-        
-        # Convert to standard trees
-        dep_tree = depccg_to_standard_tree(dep_result['parse_data'])
-        ben_tree = benepar_to_standard_tree(ben_result['parse_data'])
-        
-        # Compare structures
-        comparison = compare_tree_structures(dep_tree, ben_tree)
-        
-        # Assess parsing quality
-        quality_comparison = assessor.compare_parsing_quality(dep_tree, ben_tree)
-        comparison['quality_assessment'] = quality_comparison
-        
-        comparison['sentence'] = sentence
+    # Prepare sentence data for parallel processing
+    sentence_data = [(i+1, sentence, verbose) for i, sentence in enumerate(sentences)]
+    
+    # Process sentences in parallel
+    with mp.Pool(processes=num_cores) as pool:
+        parallel_results = pool.map(process_single_sentence, sentence_data)
+    
+    # Filter out None results (failed parses) and sort by index
+    valid_results = [r for r in parallel_results if r is not None]
+    valid_results.sort(key=lambda x: x['index'])
+    
+    processing_time = time.time() - start_time
+    results["processing_time"] = processing_time
+    results["sentences_per_second"] = len(valid_results) / processing_time if processing_time > 0 else 0
+    
+    print(f"⚡ Parallel processing completed in {processing_time:.2f} seconds")
+    print(f"📊 Successfully processed {len(valid_results)}/{len(sentences)} sentences")
+    print(f"🚀 Processing speed: {results['sentences_per_second']:.1f} sentences/second")
+    
+    # Process results and update statistics
+    for comparison in valid_results:
         results['detailed_results'].append(comparison)
         
         # Update statistics
@@ -306,6 +373,7 @@ def run_structure_comparison_test(sentences: List[str], verbose: bool = True) ->
             results['identical_branching'] += 1
         
         # Update quality statistics
+        quality_comparison = comparison['quality_assessment']
         if quality_comparison['better_parser'] == 'depccg':
             results['depccg_better'] += 1
         elif quality_comparison['better_parser'] == 'benepar':
@@ -313,50 +381,47 @@ def run_structure_comparison_test(sentences: List[str], verbose: bool = True) ->
         else:
             results['quality_ties'] += 1
         
-        # Report results
+        # Report individual results if verbose
         if verbose:
-            print(f"\n🔍 Structure Analysis:")
+            sentence = comparison['sentence']
+            index = comparison['index']
+            print(f"\n📝 Results for {index}: {sentence}")
+            print(f"🔍 Structure Analysis:")
             if comparison['identical_structure']:
-                print("✅ Identical tree structures!")
+                print("   ✅ Identical tree structures!")
             else:
-                print("⚠️  Different tree structures:")
+                print("   ⚠️  Different tree structures:")
                 for diff in comparison['differences']:
-                    print(f"   - {diff}")
+                    print(f"      - {diff}")
             
-            print(f"\n🎯 Parsing Quality Analysis:")
+            print(f"🎯 Parsing Quality Analysis:")
             dep_assessment = quality_comparison['tree1_assessment']
             ben_assessment = quality_comparison['tree2_assessment']
             
             print(f"   DepCCG Score: {quality_comparison['tree1_score']:.1f}/10")
             if dep_assessment['total_errors'] > 0:
                 print(f"     🚨 Errors ({dep_assessment['total_errors']}):")
-                for error in dep_assessment['pos_details'][:3]:  # Show first 3
+                for error in dep_assessment['pos_details'][:2]:  # Show first 2
                     print(f"       - {error}")
-                for error in dep_assessment['subcat_details'][:3]:
+                for error in dep_assessment['subcat_details'][:2]:
                     print(f"       - {error}")
-                for error in dep_assessment['structural_details'][:3]:
+                for error in dep_assessment['structural_details'][:2]:
                     print(f"       - {error}")
             
             print(f"   Benepar Score: {quality_comparison['tree2_score']:.1f}/10")
             if ben_assessment['total_errors'] > 0:
                 print(f"     🚨 Errors ({ben_assessment['total_errors']}):")
-                for error in ben_assessment['pos_details'][:3]:
+                for error in ben_assessment['pos_details'][:2]:
                     print(f"       - {error}")
-                for error in ben_assessment['subcat_details'][:3]:
+                for error in ben_assessment['subcat_details'][:2]:
                     print(f"       - {error}")
-                for error in ben_assessment['structural_details'][:3]:
+                for error in ben_assessment['structural_details'][:2]:
                     print(f"       - {error}")
             
             if quality_comparison['better_parser']:
                 print(f"   🏆 Better Parser: {quality_comparison['better_parser'].upper()} (confidence: {quality_comparison['confidence']})")
             else:
                 print(f"   🤝 Tie - similar quality")
-            
-            if len(comparison['differences']) <= 2 and verbose:  # Show trees for simple cases
-                print(f"\n🌳 {dep_tree.parser_source.upper()} tree:")
-                dep_tree.print_tree()
-                print(f"\n🌳 {ben_tree.parser_source.upper()} tree:")
-                ben_tree.print_tree()
     
     return results
 
@@ -368,6 +433,14 @@ def print_structure_summary(results: Dict[str, Any]):
     print("\n" + "="*60)
     print("📊 TREE STRUCTURE COMPARISON SUMMARY")
     print("="*60)
+    
+    # Performance metrics
+    if 'processing_time' in results:
+        print(f"⚡ Performance Metrics:")
+        print(f"   CPU cores used: {results.get('cores_used', 'N/A')}")
+        print(f"   Processing time: {results['processing_time']:.2f} seconds")
+        print(f"   Processing speed: {results['sentences_per_second']:.1f} sentences/second")
+        print()
     
     print(f"📈 Structure Agreement Statistics:")
     print(f"   Total sentences tested: {total}")
@@ -699,11 +772,17 @@ def main():
                       help="Sentences to test")
     parser.add_argument("--quiet", action="store_true", help="Only show summary")
     parser.add_argument("--save-results", help="Save detailed results to JSON file")
+    parser.add_argument("--cores", type=int, default=None, 
+                      help="Number of CPU cores to use (default: auto-detect)")
     
     args = parser.parse_args()
     
-    # Run comparison
-    results = run_structure_comparison_test(args.sentences, verbose=not args.quiet)
+    # Run comparison with multiprocessing
+    results = run_structure_comparison_test(
+        args.sentences, 
+        verbose=not args.quiet, 
+        num_cores=args.cores
+    )
     
     # Print summary
     print_structure_summary(results)
@@ -722,4 +801,10 @@ def main():
 
 
 if __name__ == "__main__":
+    # Set multiprocessing start method for compatibility
+    try:
+        mp.set_start_method('spawn', force=True)
+    except RuntimeError:
+        pass  # Method already set
+    
     main() 
