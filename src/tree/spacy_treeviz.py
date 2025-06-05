@@ -50,6 +50,105 @@ def _convert_nltk_tree(nltk_node: Any) -> Dict[str, Any]:
     return {"cat": label, "children": children}
 
 
+def _merge_punctuation_left(tree_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Post-process tree to merge punctuation tokens with preceding words,
+    matching DepCCG's tokenization style.
+    """
+    def get_leaves(node):
+        """Extract all leaf nodes (words) from tree."""
+        if isinstance(node, dict):
+            if "word" in node:
+                return [node]
+            elif "children" in node:
+                leaves = []
+                for child in node["children"]:
+                    leaves.extend(get_leaves(child))
+                return leaves
+        return []
+    
+    def is_punctuation(word):
+        """Check if a word is just punctuation."""
+        return word.strip() in ".,!?;:\"'()[]{}—-"
+    
+    # Get all leaves and create merge plan
+    leaves = get_leaves(tree_dict)
+    words = [leaf["word"] for leaf in leaves]
+    
+    # Create mapping: word -> merged_word or None (for deletion)
+    merge_mapping = {}
+    i = 0
+    
+    while i < len(words):
+        current_word = words[i]
+        
+        # Look ahead for punctuation to merge
+        if i + 1 < len(words) and is_punctuation(words[i + 1]):
+            # Merge current word with following punctuation
+            merged_word = current_word + words[i + 1]
+            merge_mapping[current_word] = merged_word
+            merge_mapping[words[i + 1]] = "DELETE"  # Mark punctuation for deletion
+            i += 2  # Skip both tokens
+        else:
+            merge_mapping[current_word] = current_word  # Keep as-is
+            i += 1
+    
+    def apply_merge(node):
+        """Apply merge mapping to tree structure."""
+        if isinstance(node, dict):
+            if "word" in node:
+                # This is a leaf
+                original_word = node["word"]
+                action = merge_mapping.get(original_word, original_word)
+                if action == "DELETE":
+                    return None  # Mark for deletion
+                else:
+                    return {"word": action}
+            elif "children" in node:
+                # This is an internal node
+                new_children = []
+                for child in node["children"]:
+                    merged_child = apply_merge(child)
+                    if merged_child is not None:  # Keep non-deleted children
+                        new_children.append(merged_child)
+                
+                # Keep internal node only if it has children
+                if new_children:
+                    return {"cat": node.get("cat", ""), "children": new_children}
+                else:
+                    return None  # Delete empty internal nodes
+        return node
+    
+    def clean_tree(node):
+        """Clean up tree structure after merging."""
+        if isinstance(node, dict):
+            if "word" in node:
+                return node  # Leaf node, keep as-is
+            elif "children" in node:
+                cleaned_children = []
+                for child in node["children"]:
+                    cleaned_child = clean_tree(child)
+                    if cleaned_child is not None:
+                        cleaned_children.append(cleaned_child)
+                
+                if cleaned_children:
+                    # If we have only one child and this node has no meaningful category,
+                    # we might want to collapse, but let's keep the structure for now
+                    return {"cat": node.get("cat", ""), "children": cleaned_children}
+                else:
+                    return None
+        return node
+    
+    # Apply the merge
+    merged_tree = apply_merge(tree_dict)
+    if merged_tree is None:
+        return tree_dict  # Return original if something went wrong
+    
+    # Clean up the structure
+    cleaned_tree = clean_tree(merged_tree)
+    return cleaned_tree if cleaned_tree is not None else tree_dict
+
+
 # --------------------------------------------------------------------
 #  The "drop-in" visualizer class using spaCy + Benepar
 # --------------------------------------------------------------------
@@ -92,9 +191,10 @@ class BeneparTreeVisualizer:
 
             nltk_tree = nltk.Tree.fromstring(sp._.parse_string)
             tree_dict = _convert_nltk_tree(nltk_tree)
+            merged_tree_dict = _merge_punctuation_left(tree_dict)
             return {
                 "success": True,
-                "parse_data": tree_dict,
+                "parse_data": merged_tree_dict,
                 "parse_time": duration,
                 "error": None,
             }
