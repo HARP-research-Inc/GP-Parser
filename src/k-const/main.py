@@ -51,6 +51,14 @@ print_results_dist = dependency_distance_analysis.print_results
 print_summary_dist = dependency_distance_analysis.print_summary
 print_pos_structured_results = dependency_distance_analysis.print_pos_structured_results
 
+# Import from dependency-distribution-modeling.py
+spec_distrib = importlib.util.spec_from_file_location("dependency_distribution_modeling", os.path.join(os.path.dirname(__file__), "dependency-distribution-modeling.py"))
+dependency_distribution_modeling = importlib.util.module_from_spec(spec_distrib)
+spec_distrib.loader.exec_module(dependency_distribution_modeling)
+analyze_dependency_distributions = dependency_distribution_modeling.analyze_dependency_distributions
+print_distribution_results = dependency_distribution_modeling.print_distribution_results
+save_compact_distributions = dependency_distribution_modeling.save_compact_distributions
+
 def analyze_sentence(text: str, output_file: str = None, raw: bool = False, format_type: str = 'table', highlight_pos: list = None):
     """
     Analyze a sentence and get POS vectors for each word.
@@ -268,6 +276,14 @@ def main():
     dist_parser.add_argument('--quiet', '-q', action='store_true', help="Only show summary, not detailed results")
     dist_parser.add_argument('--pos-only', action='store_true', help="Only show POS-organized results")
     dist_parser.add_argument('--pos-json', metavar='FILE', help="Save only the POS-organized data structure to a clean JSON file")
+    
+    # Dependency distribution modeling - model distances as Gaussian distributions
+    distrib_parser = subparsers.add_parser('depgauss', help='Model dependency distances as Gaussian distributions')
+    distrib_parser.add_argument('input_file', help="Path to the input text file")
+    distrib_parser.add_argument('--output', '-o', help="Save full results to JSON file")
+    distrib_parser.add_argument('--compact', '-c', help="Save compact distribution models to JSON file")
+    distrib_parser.add_argument('--min-samples', type=int, default=10, help="Minimum samples needed to fit distributions")
+    distrib_parser.add_argument('--quiet', '-q', action='store_true', help="Only show summary, not detailed results")
     
     args = p.parse_args()
     if args.mode is None:
@@ -531,6 +547,43 @@ def main():
                 print(f"\nPOS-organized data saved to {args.pos_json}")
             except Exception as e:
                 print(f"Error saving POS data: {e}")
+    
+    elif args.mode == 'depgauss':
+        # Dependency distribution modeling
+        import json
+        
+        # Run analysis
+        results = analyze_dependency_distributions(args.input_file, args.min_samples)
+        
+        if not results:
+            print("Analysis failed or no results generated.")
+            return
+        
+        # Print results
+        if not args.quiet:
+            print_distribution_results(results)
+        else:
+            summary = results['summary']
+            print(f"Analysis complete: {summary['total_relationships']:,} relationships analyzed")
+            print(f"Fitted {summary['fitted_distributions']} distributions from {summary['dependency_combinations']} combinations")
+            print(f"Distribution types: {summary['distribution_types']['single_gaussian']} Gaussian, "
+                  f"{summary['distribution_types']['gaussian_mixture']} mixtures")
+        
+        # Save results
+        if args.output:
+            try:
+                with open(args.output, 'w', encoding='utf-8') as f:
+                    json.dump(results, f, indent=2, ensure_ascii=False)
+                print(f"\nFull results saved to {args.output}")
+            except Exception as e:
+                print(f"Error saving results: {e}")
+        
+        if args.compact:
+            try:
+                save_compact_distributions(results, args.compact)
+                print(f"Compact distribution models saved to {args.compact}")
+            except Exception as e:
+                print(f"Error saving compact results: {e}")
 
 if __name__ == '__main__':
     main() 
