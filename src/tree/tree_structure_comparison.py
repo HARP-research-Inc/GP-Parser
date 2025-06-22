@@ -14,11 +14,17 @@ Usage Examples:
     # Basic usage with auto-detected cores
     python tree_structure_comparison.py --sentences "The cat sleeps." "She reads books."
     
-    # Use specific number of cores
-    python tree_structure_comparison.py --cores 4 --sentences "Hello world." "How are you?"
+    # Use 64 cores for maximum performance with JSON output
+    python tree_structure_comparison.py --cores 64 --save-individual-json \
+        --sentences "Sentence 1" "Sentence 2" "Sentence 3" ... "Sentence N"
     
-    # Process quietly and save results
-    python tree_structure_comparison.py --quiet --save-results results.json --sentences "Test sentence."
+    # Large batch processing with full output
+    python tree_structure_comparison.py --cores 64 --save-individual-json \
+        --save-results comparison_results.json --sentences "Many sentences here"
+    
+    # Quiet mode for massive datasets
+    python tree_structure_comparison.py --cores 64 --quiet --save-individual-json \
+        --sentences "Process hundreds of sentences silently"
 """
 
 import argparse
@@ -31,6 +37,18 @@ from functools import partial
 
 from depccg_treeviz import CCGTreeVisualizer as DepCCG
 from spacy_treeviz import BeneparTreeVisualizer as Benepar
+
+
+def sanitize_filename(text: str, max_length: int = 30) -> str:
+    """Convert text to a safe filename by removing punctuation and limiting length."""
+    # Remove/replace problematic characters
+    safe = re.sub(r'[^\w\s-]', '', text.strip())
+    # Replace spaces with underscores
+    safe = re.sub(r'\s+', '_', safe)
+    # Limit length
+    if len(safe) > max_length:
+        safe = safe[:max_length]
+    return safe or "sentence"
 
 
 class StandardTree:
@@ -263,16 +281,16 @@ def compare_tree_structures(tree1: StandardTree, tree2: StandardTree) -> Dict[st
     return comparison
 
 
-def process_single_sentence(sentence_data: Tuple[int, str, bool]) -> Optional[Dict[str, Any]]:
+def process_single_sentence(sentence_data: Tuple[int, str, bool, bool]) -> Optional[Dict[str, Any]]:
     """Process a single sentence in a worker process.
     
     Args:
-        sentence_data: Tuple of (index, sentence, verbose)
+        sentence_data: Tuple of (index, sentence, verbose, save_json)
     
     Returns:
         Dict with comparison results or None if parsing failed
     """
-    index, sentence, verbose = sentence_data
+    index, sentence, verbose, save_json = sentence_data
     
     # Create parser instances in each worker process
     dep_parser = DepCCG()
@@ -291,6 +309,54 @@ def process_single_sentence(sentence_data: Tuple[int, str, bool]) -> Optional[Di
             print(f"❌ Worker {index}: One or both parsers failed - skipping comparison")
         return None
     
+    # Save individual JSON files if requested
+    json_files_created = []
+    if save_json:
+        import os
+        os.makedirs("output", exist_ok=True)
+        
+        # Create safe filename from sentence
+        safe_name = sanitize_filename(sentence[:30])
+        
+        # Save DepCCG parse result
+        dep_json_file = f"output/{safe_name}_{index:03d}_depccg.json"
+        with open(dep_json_file, 'w') as f:
+            json.dump({
+                'sentence': sentence,
+                'parser': 'depccg',
+                'index': index,
+                'parse_data': dep_result['parse_data'],
+                'success': dep_result['success'],
+                'timing': dep_result.get('timing', {}),
+                'metadata': {
+                    'timestamp': time.time(),
+                    'parser_version': 'depccg',
+                    'processing_mode': 'multicore'
+                }
+            }, f, indent=2)
+        json_files_created.append(dep_json_file)
+        
+        # Save Benepar parse result  
+        ben_json_file = f"output/{safe_name}_{index:03d}_benepar.json"
+        with open(ben_json_file, 'w') as f:
+            json.dump({
+                'sentence': sentence,
+                'parser': 'benepar',
+                'index': index,
+                'parse_data': ben_result['parse_data'],
+                'success': ben_result['success'],
+                'timing': ben_result.get('timing', {}),
+                'metadata': {
+                    'timestamp': time.time(),
+                    'parser_version': 'benepar',
+                    'processing_mode': 'multicore'
+                }
+            }, f, indent=2)
+        json_files_created.append(ben_json_file)
+        
+        if verbose:
+            print(f"💾 Worker {index}: Saved JSON files: {', '.join(json_files_created)}")
+    
     # Convert to standard trees
     dep_tree = depccg_to_standard_tree(dep_result['parse_data'])
     ben_tree = benepar_to_standard_tree(ben_result['parse_data'])
@@ -303,6 +369,11 @@ def process_single_sentence(sentence_data: Tuple[int, str, bool]) -> Optional[Di
     comparison['quality_assessment'] = quality_comparison
     comparison['sentence'] = sentence
     comparison['index'] = index
+    comparison['json_files_created'] = json_files_created
+    comparison['raw_parse_results'] = {
+        'depccg': dep_result,
+        'benepar': ben_result
+    }
     
     if verbose:
         print(f"✅ Worker {index}: Completed parsing and comparison")
@@ -310,13 +381,14 @@ def process_single_sentence(sentence_data: Tuple[int, str, bool]) -> Optional[Di
     return comparison
 
 
-def run_structure_comparison_test(sentences: List[str], verbose: bool = True, num_cores: int = None) -> Dict[str, Any]:
+def run_structure_comparison_test(sentences: List[str], verbose: bool = True, num_cores: int = None, save_individual_json: bool = False) -> Dict[str, Any]:
     """Run structure comparison test on multiple sentences with multiprocessing.
     
     Args:
         sentences: List of sentences to process
         verbose: Whether to show detailed progress
         num_cores: Number of CPU cores to use (None = auto-detect)
+        save_individual_json: Whether to save individual parse results as JSON files
     """
     if num_cores is None:
         num_cores = mp.cpu_count()
@@ -340,7 +412,7 @@ def run_structure_comparison_test(sentences: List[str], verbose: bool = True, nu
     }
     
     # Prepare sentence data for parallel processing
-    sentence_data = [(i+1, sentence, verbose) for i, sentence in enumerate(sentences)]
+    sentence_data = [(i+1, sentence, verbose, save_individual_json) for i, sentence in enumerate(sentences)]
     
     # Process sentences in parallel
     with mp.Pool(processes=num_cores) as pool:
@@ -422,6 +494,16 @@ def run_structure_comparison_test(sentences: List[str], verbose: bool = True, nu
                 print(f"   🏆 Better Parser: {quality_comparison['better_parser'].upper()} (confidence: {quality_comparison['confidence']})")
             else:
                 print(f"   🤝 Tie - similar quality")
+    
+    # Report JSON files created
+    if save_individual_json and valid_results:
+        all_json_files = []
+        for result in valid_results:
+            all_json_files.extend(result.get('json_files_created', []))
+        print(f"\n💾 Created {len(all_json_files)} JSON parse files in output/ directory")
+        if verbose and len(all_json_files) <= 12:  # Show files if not too many
+            for json_file in all_json_files:
+                print(f"   📄 {json_file}")
     
     return results
 
@@ -774,6 +856,8 @@ def main():
     parser.add_argument("--save-results", help="Save detailed results to JSON file")
     parser.add_argument("--cores", type=int, default=None, 
                       help="Number of CPU cores to use (default: auto-detect)")
+    parser.add_argument("--save-individual-json", action="store_true",
+                      help="Save individual parse results as JSON files for each sentence")
     
     args = parser.parse_args()
     
@@ -781,7 +865,8 @@ def main():
     results = run_structure_comparison_test(
         args.sentences, 
         verbose=not args.quiet, 
-        num_cores=args.cores
+        num_cores=args.cores,
+        save_individual_json=args.save_individual_json
     )
     
     # Print summary
