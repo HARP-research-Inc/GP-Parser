@@ -48,5 +48,479 @@
       "count": 91,
       "relative": 1.0
     }
-  }
+  },
+  "agile": {
+    "ADJ": {
+      "count": 2,
+      "relative": 1.0
+    }
+  },
+  "and": {
+    "CONJ": {
+      "count": 28850,
+      "relative": 0.9999
+    },
+    "X": {
+      "count": 3,
+      "relative": 0.0001
+    }
+  },
+  "are": {
+    "VERB": {
+      "count": 4394,
+      "relative": 1.0
+    }
+  },
+  "beautiful": {
+    "ADJ": {
+      "count": 127,
+      "relative": 1.0
+    }
+  },
+  "brown": {
+    "NOUN": {
+      "count": 110,
+      "relative": 0.625
+    },
+    "ADJ": {
+      "count": 66,
+      "relative": 0.375
+    }
+  },
+  "but": {
+    "CONJ": {
+      "count": 4224,
+      "relative": 0.9642
+    },
+    "ADP": {
+      "count": 131,
+      "relative": 0.0299
+    },
+    "ADV": {
+      "count": 26,
+      "relative": 0.0059
+    }
+  },
+  "cat": {
+    "NOUN": {
+      "count": 23,
+      "relative": 1.0
+    }
+  },
+  "cats": {
+    "NOUN": {
+      "count": 18,
+      "relative": 1.0
+    }
+  },
+  "common": {
+    "ADJ": {
+      "count": 211,
+      "relative": 0.9462
+    },
+    "NOUN": {
+      "count": 12,
+      "relative": 0.0538
+    }
+  },
+  "contains": {
+    "VERB": {
+      "count": 38,
+      "relative": 1.0
+    }
+  },
+  "dog": {
+    "NOUN": {
+      "count": 75,
+      "relative": 1.0
+    }
+  },
+  "dogs": {
+    "NOUN": {
+      "count": 69,
+      "relative": 0.9857
+    },
+    "VERB": {
+      "count": 1,
+      "relative": 0.0143
+    }
+  },
+  "exercise": {
+    "VERB": {
+      "count": 23,
+      "relative": 0.3966
+    },
+    "NOUN": {
+      "count": 35,
+      "relative": 0.6034
+    }
+  },
+  "fast": {
+    "ADJ": {
+      "count": 31,
+      "relative": 0.3974
+    },
+    "ADV": {
+      "count": 46,
+      "relative": 0.5897
+    },
+    "NOUN": {
+      "count": 1,
+      "relative": 0.0128
+    }
+  },
+  "flies": {
+    "VERB": {
+      "count": 4,
+      "relative": 0.3333
+    },
+    "NOUN": {
+      "count": 8,
+      "relative": 0.6667
+    }
+  },
+  "fox": {
+    "NOUN": {
+      "count": 12,
+      "relative": 1.0
+    }
+  },
+  "fun": {
+    "NOUN": {
+      "count": 44,
+      "relative": 1.0
+    }
+  },
+  "good": {
+    "ADJ": {
+      "count": 732,
+      "relative": 0.9082
+    },
+    "NOUN": {
+      "count": 61,
+      "relative": 0.0757
+    },
+    "ADV": {
+      "count": 13,
+      "relative": 0.0161
+    }
+  },
+  "having": {
+    "VERB": {
+      "count": 279,
+      "relative": 1.0
+    }
+  },
+  "he": {
+    "PRON": {
+      "count": 9546,
+      "relative": 0.9998
+    },
+    "X": {
+      "count": 2,
+      "relative": 0.0002
+    }
+  },
+  "health": {
+    "NOUN": {
+      "count": 105,
+      "relative": 1.0
+    }
+  },
+  "is": {
+    "VERB": {
+      "count": 10108,
+      "relative": 0.9999
+    },
+    "X": {
+      "count": 1,
+      "relative": 0.0001
+    }
+  },
+  "jumps": {
+    "NOUN": {
+      "count": 1,
+      "relative": 0.5
+    },
+    "VERB": {
+      "count": 1,
+      "relative": 0.5
+    }
+  },
+  "lazy": {
+    "ADJ": {
+      "count": 9,
+      "relative": 1.0
+    }
+  },
+  "life": {
+    "NOUN": {
+      "count": 715,
+      "relative": 1.0
+    }
+  },
+  "many": {
+    "ADJ": {
+      "count": 996,
+      "relative": 0.967
+    },
+    "PRT": {
+      "count": 25,
+      "relative": 0.0243
+    },
+    "ADV": {
+      "count": 8,
+      "relative": 0.0078
+    },
+    "X": {
+      "count": 1,
+      "relative": 0.001
+    }
+  },
+  "more": {
+    "ADJ": {
+      "count": 989,
+      "relative": 0.4465
+    },
+    "ADV": {
+      "count": 1212,
+      "relative": 0.5472
+    },
+    "NOUN": {
+      "count": 13,
+      "relative": 0.0059
+    },
+    "X": {
+      "count": 1,
+      "relative": 0.0005
+    }
+  },
+  "over": {
+    "PRT": {
+      "count": 392,
+      "relative": 0.3172
+    },
+    "ADP": {
+      "count": 841,
+      "relative": 0.6804
+    },
+    "ADJ": {
+      "count": 3,
+      "relative": 0.0024
+    }
+  },
+  "park": {
+    "NOUN": {
+      "count": 93,
+      "relative": 0.9894
+    },
+    "VERB": {
+      "count": 1,
+      "relative": 0.0106
+    }
+  },
+  "quick": {
+    "ADJ": {
+      "count": 58,
+      "relative": 0.8529
+    },
+    "ADV": {
+      "count": 9,
+      "relative": 0.1324
+    },
+    "NOUN": {
+      "count": 1,
+      "relative": 0.0147
+    }
+  },
+  "quickly": {
+    "ADV": {
+      "count": 89,
+      "relative": 1.0
+    }
+  },
+  "rapidly": {
+    "ADV": {
+      "count": 65,
+      "relative": 1.0
+    }
+  },
+  "run": {
+    "VERB": {
+      "count": 157,
+      "relative": 0.7406
+    },
+    "NOUN": {
+      "count": 55,
+      "relative": 0.2594
+    }
+  },
+  "running": {
+    "VERB": {
+      "count": 120,
+      "relative": 0.9756
+    },
+    "NOUN": {
+      "count": 3,
+      "relative": 0.0244
+    }
+  },
+  "runs": {
+    "NOUN": {
+      "count": 39,
+      "relative": 0.7091
+    },
+    "VERB": {
+      "count": 16,
+      "relative": 0.2909
+    }
+  },
+  "sentence": {
+    "NOUN": {
+      "count": 34,
+      "relative": 1.0
+    }
+  },
+  "she": {
+    "PRON": {
+      "count": 2860,
+      "relative": 1.0
+    }
+  },
+  "short": {
+    "ADJ": {
+      "count": 195,
+      "relative": 0.9198
+    },
+    "ADV": {
+      "count": 14,
+      "relative": 0.066
+    },
+    "NOUN": {
+      "count": 3,
+      "relative": 0.0142
+    }
+  },
+  "slowly": {
+    "ADV": {
+      "count": 115,
+      "relative": 1.0
+    }
+  },
+  "the": {
+    "DET": {
+      "count": 69968,
+      "relative": 1.0
+    },
+    "X": {
+      "count": 3,
+      "relative": 0.0
+    }
+  },
+  "this": {
+    "DET": {
+      "count": 5144,
+      "relative": 0.9998
+    },
+    "ADV": {
+      "count": 1,
+      "relative": 0.0002
+    }
+  },
+  "through": {
+    "ADP": {
+      "count": 910,
+      "relative": 0.9372
+    },
+    "PRT": {
+      "count": 61,
+      "relative": 0.0628
+    }
+  },
+  "time": {
+    "NOUN": {
+      "count": 1597,
+      "relative": 0.9994
+    },
+    "VERB": {
+      "count": 1,
+      "relative": 0.0006
+    }
+  },
+  "walks": {
+    "VERB": {
+      "count": 7,
+      "relative": 0.5385
+    },
+    "NOUN": {
+      "count": 6,
+      "relative": 0.4615
+    }
+  },
+  "when": {
+    "ADV": {
+      "count": 2331,
+      "relative": 1.0
+    }
+  },
+  "while": {
+    "ADP": {
+      "count": 600,
+      "relative": 0.8824
+    },
+    "NOUN": {
+      "count": 78,
+      "relative": 0.1147
+    },
+    "VERB": {
+      "count": 2,
+      "relative": 0.0029
+    }
+  },
+  "words": {
+    "NOUN": {
+      "count": 274,
+      "relative": 1.0
+    }
+  },
+  "you": {
+    "PRON": {
+      "count": 3286,
+      "relative": 1.0
+    }
+  },
+  "a": {
+    "DET": {
+      "count": 23070,
+      "relative": 0.9946
+    },
+    "NOUN": {
+      "count": 116,
+      "relative": 0.005
+    },
+    "X": {
+      "count": 9,
+      "relative": 0.0004
+    }
+  },
+  "abandoned": {
+    "VERB": {
+      "count": 25,
+      "relative": 1.0
+    }
+  },
+  "abashed": {},
+  "abbey": {
+    "NOUN": {
+      "count": 7,
+      "relative": 1.0
+    }
+  },
+  "abbreviation": {
+    "NOUN": {
+      "count": 1,
+      "relative": 1.0
+    }
+  },
+  "aberdeen": {}
 }

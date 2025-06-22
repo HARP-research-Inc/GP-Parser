@@ -69,4 +69,72 @@ def get_pos_distribution(word: str):
     
     return result
 
+def process_text_file_bulk(text_file_path: str, output_file_path: str = None):
+    """
+    Process all unique tokens from a text file and generate POS distributions.
+    
+    Args:
+        text_file_path: Path to the input text file
+        output_file_path: Optional path for output JSON file. If None, prints to console.
+    
+    Returns:
+        dict: Mapping of words to their POS distributions
+    """
+    # Ensure tokenizer is available
+    nltk.download('punkt', quiet=True)
+    
+    # Read and tokenize the text file
+    print(f"Reading and tokenizing '{text_file_path}'...")
+    try:
+        with open(text_file_path, 'r', encoding='utf-8') as f:
+            text = f.read()
+    except FileNotFoundError:
+        print(f"Error: File '{text_file_path}' not found.")
+        return {}
+    except Exception as e:
+        print(f"Error reading file: {e}")
+        return {}
+    
+    # Tokenize and get unique words (case-insensitive)
+    tokens = nltk.word_tokenize(text)
+    # Filter out punctuation and get unique words
+    unique_words = set()
+    for token in tokens:
+        if token.isalpha():  # Only include alphabetic tokens
+            unique_words.add(token.lower())
+    
+    print(f"Found {len(unique_words)} unique alphabetic tokens to process...")
+    
+    # Process each unique word
+    results = {}
+    processed = 0
+    cached = 0
+    
+    # Load cache once to check for existing entries
+    cache = load_cache()
+    
+    for word in sorted(unique_words):
+        if word in cache:
+            cached += 1
+            results[word] = cache[word]
+        else:
+            results[word] = get_pos_distribution(word)
+            processed += 1
+    
+    print(f"\nProcessing complete:")
+    print(f"  - Used cached results: {cached}")
+    print(f"  - Computed from scratch: {processed}")
+    print(f"  - Total unique words: {len(unique_words)}")
+    
+    # Output results
+    if output_file_path:
+        try:
+            with open(output_file_path, 'w', encoding='utf-8') as f:
+                json.dump(results, f, indent=2, ensure_ascii=False)
+            print(f"Results saved to '{output_file_path}'")
+        except Exception as e:
+            print(f"Error saving results: {e}")
+    
+    return results
+
 
