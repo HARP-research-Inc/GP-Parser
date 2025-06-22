@@ -28,6 +28,29 @@ pos_mask = importlib.util.module_from_spec(spec_mask)
 spec_mask.loader.exec_module(pos_mask)
 get_mask_for_pos_tags = pos_mask.get_mask_for_pos_tags
 
+# Import from adjective-position-analysis.py
+spec_adj = importlib.util.spec_from_file_location("adjective_position_analysis", os.path.join(os.path.dirname(__file__), "adjective-position-analysis.py"))
+adjective_position_analysis = importlib.util.module_from_spec(spec_adj)
+spec_adj.loader.exec_module(adjective_position_analysis)
+analyze_adjective_positions = adjective_position_analysis.analyze_adjective_positions
+print_results_pos = adjective_position_analysis.print_results
+
+# Import from dependency-adjective-analysis.py
+spec_dep = importlib.util.spec_from_file_location("dependency_adjective_analysis", os.path.join(os.path.dirname(__file__), "dependency-adjective-analysis.py"))
+dependency_adjective_analysis = importlib.util.module_from_spec(spec_dep)
+spec_dep.loader.exec_module(dependency_adjective_analysis)
+analyze_adjective_noun_dependencies = dependency_adjective_analysis.analyze_adjective_noun_dependencies
+print_results_dep = dependency_adjective_analysis.print_results
+
+# Import from dependency-distance-analysis.py
+spec_dist = importlib.util.spec_from_file_location("dependency_distance_analysis", os.path.join(os.path.dirname(__file__), "dependency-distance-analysis.py"))
+dependency_distance_analysis = importlib.util.module_from_spec(spec_dist)
+spec_dist.loader.exec_module(dependency_distance_analysis)
+analyze_dependency_distances = dependency_distance_analysis.analyze_dependency_distances
+print_results_dist = dependency_distance_analysis.print_results
+print_summary_dist = dependency_distance_analysis.print_summary
+print_pos_structured_results = dependency_distance_analysis.print_pos_structured_results
+
 def analyze_sentence(text: str, output_file: str = None, raw: bool = False, format_type: str = 'table', highlight_pos: list = None):
     """
     Analyze a sentence and get POS vectors for each word.
@@ -225,6 +248,27 @@ def main():
     matrix_parser.add_argument('--print', action='store_true', help="Print the matrix values.")
     matrix_parser.add_argument('--highlight', nargs='+', help="POS tags to highlight in red (e.g. NOUN VERB).")
     
+    # Adjective position analysis - analyze positional distribution of adjectives around nouns
+    adj_parser = subparsers.add_parser('adjpos', help='Analyze positional distribution of adjectives around nouns')
+    adj_parser.add_argument('input_file', help="Path to the input text file")
+    adj_parser.add_argument('--range', '-r', type=int, default=2, help="Displacement range to analyze (default: 2)")
+    adj_parser.add_argument('--output', '-o', help="Save results to JSON file")
+    adj_parser.add_argument('--quiet', '-q', action='store_true', help="Only show summary, not detailed results")
+    
+    # Dependency adjective analysis - analyze syntactic adjective-noun relationships using spaCy
+    dep_parser = subparsers.add_parser('depadj', help='Analyze adjective-noun dependencies using spaCy parser')
+    dep_parser.add_argument('input_file', help="Path to the input text file")
+    dep_parser.add_argument('--output', '-o', help="Save results to JSON file")
+    dep_parser.add_argument('--quiet', '-q', action='store_true', help="Only show summary, not detailed results")
+    
+    # Comprehensive dependency distance analysis - analyze signed distances for ALL dependency types
+    dist_parser = subparsers.add_parser('depdist', help='Analyze signed distances for all dependency relationships')
+    dist_parser.add_argument('input_file', help="Path to the input text file")
+    dist_parser.add_argument('--output', '-o', help="Save results to JSON file")
+    dist_parser.add_argument('--quiet', '-q', action='store_true', help="Only show summary, not detailed results")
+    dist_parser.add_argument('--pos-only', action='store_true', help="Only show POS-organized results")
+    dist_parser.add_argument('--pos-json', metavar='FILE', help="Save only the POS-organized data structure to a clean JSON file")
+    
     args = p.parse_args()
     if args.mode is None:
         p.print_help()
@@ -375,6 +419,118 @@ def main():
         # Show shape for easy copying to other code
         print(f"Usage: matrix = np.load('{args.output or 'matrix.npy'}')")
         print(f"Shape: {matrix.shape} (dtype: {matrix.dtype})")
+    
+    elif args.mode == 'adjpos':
+        # Adjective position analysis
+        import json
+        
+        # Validate displacement range
+        if args.range < 1 or args.range > 10:
+            print("Error: Displacement range must be between 1 and 10")
+            return
+        
+        # Run analysis
+        results = analyze_adjective_positions(args.input_file, args.range)
+        
+        if not results:
+            print("Analysis failed or no results generated.")
+            return
+        
+        # Print results
+        if not args.quiet:
+            print_results_pos(results)
+        else:
+            # Just show summary
+            print(f"Analysis complete: {results['total_nouns']:,} nouns, "
+                  f"{results['summary']['total_adjectives_found']:,} adjectives found")
+            
+            # Show top position
+            sorted_by_prob = sorted(results['position_analysis'].items(), 
+                                   key=lambda x: x[1]['probability'], reverse=True)
+            if sorted_by_prob:
+                top_pos, top_data = sorted_by_prob[0]
+                direction = "before" if top_pos < 0 else "after"
+                print(f"Most likely position: {abs(top_pos)} {direction} noun ({top_data['probability']:.1%})")
+        
+        # Save to file if requested
+        if args.output:
+            try:
+                with open(args.output, 'w', encoding='utf-8') as f:
+                    json.dump(results, f, indent=2, ensure_ascii=False)
+                print(f"\nResults saved to {args.output}")
+            except Exception as e:
+                print(f"Error saving results: {e}")
+    
+    elif args.mode == 'depadj':
+        # Dependency adjective analysis
+        import json
+        
+        # Run analysis
+        results = analyze_adjective_noun_dependencies(args.input_file)
+        
+        if not results:
+            print("Analysis failed or no results generated.")
+            return
+        
+        # Print results
+        if not args.quiet:
+            print_results_dep(results)
+        else:
+            # Just show summary
+            print(f"Analysis complete: {results['total_relationships']:,} adj-noun relationships found")
+            if results['total_relationships'] > 0:
+                stats = results['distance_statistics']
+                print(f"Average distance: {stats['mean']:.2f} tokens")
+                direction = results['direction_analysis']
+                print(f"Direction: {direction['before_percentage']:.1f}% before, {direction['after_percentage']:.1f}% after")
+        
+        # Save to file if requested
+        if args.output:
+            try:
+                with open(args.output, 'w', encoding='utf-8') as f:
+                    json.dump(results, f, indent=2, ensure_ascii=False)
+                print(f"\nResults saved to {args.output}")
+            except Exception as e:
+                print(f"Error saving results: {e}")
+    
+    elif args.mode == 'depdist':
+        # Comprehensive dependency distance analysis
+        import json
+        
+        # Run analysis
+        results = analyze_dependency_distances(args.input_file)
+        
+        if not results:
+            print("Analysis failed or no results generated.")
+            return
+        
+        # Print results
+        if args.pos_only:
+            print_pos_structured_results(results)
+        elif not args.quiet:
+            print_results_dist(results)
+            print_pos_structured_results(results)
+        else:
+            print_summary_dist(results)
+        
+        # Save to file if requested
+        if args.output:
+            try:
+                with open(args.output, 'w', encoding='utf-8') as f:
+                    json.dump(results, f, indent=2, ensure_ascii=False)
+                print(f"\nResults saved to {args.output}")
+            except Exception as e:
+                print(f"Error saving results: {e}")
+        
+        # Save just the POS-organized structure if requested
+        if args.pos_json:
+            try:
+                pos_data = results.get('pos_dependency_offsets', {})
+                with open(args.pos_json, 'w', encoding='utf-8') as f:
+                    json.dump(pos_data, f, indent=2, ensure_ascii=False)
+                print(f"\nPOS-organized data saved to {args.pos_json}")
+            except Exception as e:
+                print(f"Error saving POS data: {e}")
 
 if __name__ == '__main__':
     main() 
