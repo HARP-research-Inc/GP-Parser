@@ -20,8 +20,15 @@ get_word_vector = prob_dist_mat.get_word_vector
 convert_pos_cache_to_matrix = prob_dist_mat.convert_pos_cache_to_matrix
 get_similar_words = prob_dist_mat.get_similar_words
 print_word_vector = prob_dist_mat.print_word_vector
+sentence_to_matrix = prob_dist_mat.sentence_to_matrix
 
-def analyze_sentence(text: str, output_file: str = None, raw: bool = False, format_type: str = 'table'):
+# Import from pos-mask.py
+spec_mask = importlib.util.spec_from_file_location("pos_mask", os.path.join(os.path.dirname(__file__), "pos-mask.py"))
+pos_mask = importlib.util.module_from_spec(spec_mask)
+spec_mask.loader.exec_module(pos_mask)
+get_mask_for_pos_tags = pos_mask.get_mask_for_pos_tags
+
+def analyze_sentence(text: str, output_file: str = None, raw: bool = False, format_type: str = 'table', highlight_pos: list = None):
     """
     Analyze a sentence and get POS vectors for each word.
     
@@ -109,13 +116,23 @@ def analyze_sentence(text: str, output_file: str = None, raw: bool = False, form
         words_list = list(results.keys())
         matrix = np.array([results[word] for word in words_list])
         
+        # Get highlight indices if specified
+        highlight_indices = set()
+        if highlight_pos:
+            highlight_indices = get_mask_for_pos_tags(highlight_pos)
+        
         print(f"Matrix shape: {len(words_list)} words × 16 POS dimensions")
+        if highlight_pos:
+            print(f"Highlighting: {', '.join(highlight_pos)}")
         print()
         
         # Print header with POS tags
         print("Word".ljust(12), end=" ")
-        for tag in prob_dist_mat.UNIVERSAL_POS_TAGS:
-            print(f"{tag:>4}", end=" ")
+        for i, tag in enumerate(prob_dist_mat.UNIVERSAL_POS_TAGS):
+            if i in highlight_indices:
+                print(f"\033[91m{tag:>4}\033[0m", end=" ")  # Red header for highlighted columns
+            else:
+                print(f"{tag:>4}", end=" ")
         print()
         print("-" * 12 + " " + "-" * (5 * 16))
         
@@ -129,7 +146,11 @@ def analyze_sentence(text: str, output_file: str = None, raw: bool = False, form
                 else:
                     formatted_value = f"{value:.2f}"[1:]  # Remove leading 0 for 0.xx -> .xx
                 
-                if value > 0.001:  # Non-zero values in normal color
+                # Apply highlighting
+                if j in highlight_indices and value > 0.001:
+                    # Highlighted non-zero values in red
+                    print(f"\033[91m{formatted_value:>4}\033[0m", end=" ")
+                elif value > 0.001:  # Non-zero values in normal color
                     print(f"{formatted_value:>4}", end=" ")
                 else:  # Zero values in very dark grey (almost black)
                     print(f"\033[2;30m{formatted_value:>4}\033[0m", end=" ")
@@ -194,6 +215,15 @@ def main():
     sentence_parser.add_argument('--raw', action='store_true', help="Output raw vector numbers.")
     sentence_parser.add_argument('--format', choices=['table', 'json', 'compact', 'matrix'], default='table', 
                                help="Output format (default: table).")
+    sentence_parser.add_argument('--highlight', nargs='+', help="POS tags to highlight in red (e.g. NOUN VERB).")
+    
+    # Matrix mode - get fixed-size matrix for a sentence
+    matrix_parser = subparsers.add_parser('matrix', help='Get fixed-size matrix (m×16) for a sentence')
+    matrix_parser.add_argument('text', help="The sentence or text to convert to matrix.")
+    matrix_parser.add_argument('--length', '-l', type=int, default=32, help="Matrix length (default: 32).")
+    matrix_parser.add_argument('--output', '-o', help="Save matrix to numpy file (.npy).")
+    matrix_parser.add_argument('--print', action='store_true', help="Print the matrix values.")
+    matrix_parser.add_argument('--highlight', nargs='+', help="POS tags to highlight in red (e.g. NOUN VERB).")
     
     args = p.parse_args()
     if args.mode is None:
@@ -275,7 +305,76 @@ def main():
                 print(f"\n{word}: {vector}")
     
     elif args.mode == 'sentence':
-        analyze_sentence(args.text, args.output, args.raw, args.format)
+        analyze_sentence(args.text, args.output, args.raw, args.format, args.highlight)
+    
+    elif args.mode == 'matrix':
+        import numpy as np
+        matrix, words = sentence_to_matrix(args.text, args.length)
+        
+        # Get highlight indices if specified
+        highlight_indices = set()
+        if args.highlight:
+            highlight_indices = get_mask_for_pos_tags(args.highlight)
+        
+        print(f"Generated {args.length}×16 matrix for: \"{args.text}\"")
+        print(f"Words used: {', '.join(words)} ({len(words)} words)")
+        print(f"Matrix shape: {matrix.shape}")
+        if args.highlight:
+            print(f"Highlighting: {', '.join(args.highlight)}")
+        print()
+        
+        # Print visual matrix format
+        print("Word".ljust(12), end=" ")
+        for i, tag in enumerate(prob_dist_mat.UNIVERSAL_POS_TAGS):
+            if i in highlight_indices:
+                print(f"\033[91m{tag:>4}\033[0m", end=" ")  # Red header for highlighted columns
+            else:
+                print(f"{tag:>4}", end=" ")
+        print()
+        print("-" * 12 + " " + "-" * (5 * 16))
+        
+        # Print each row with word name (or empty for padding rows)
+        for i in range(args.length):
+            if i < len(words):
+                word_name = words[i][:11]
+            else:
+                word_name = f"[{i+1}]"  # Show row number for empty rows
+            
+            print(f"{word_name:<11}", end=" ")
+            for j, value in enumerate(matrix[i]):
+                # Format as .xx (remove leading 0 from 0.xx)
+                if value >= 1.0:
+                    formatted_value = f"{value:.2f}"  # Keep 1.00 format for values >= 1
+                else:
+                    formatted_value = f"{value:.2f}"[1:]  # Remove leading 0 for 0.xx -> .xx
+                
+                # Apply highlighting
+                if j in highlight_indices and value > 0.001:
+                    # Highlighted non-zero values in red
+                    print(f"\033[91m{formatted_value:>4}\033[0m", end=" ")
+                elif value > 0.001:  # Non-zero values in normal color
+                    print(f"{formatted_value:>4}", end=" ")
+                else:  # Zero values in very dark grey (almost black)
+                    print(f"\033[2;30m{formatted_value:>4}\033[0m", end=" ")
+            print()
+        
+        if args.print:
+            print("\nRaw matrix (numpy array):")
+            print(matrix)
+        
+        if args.output:
+            np.save(args.output, matrix)
+            print(f"Matrix saved to {args.output}")
+        
+        # Always show a summary of non-zero rows
+        non_zero_rows = np.count_nonzero(matrix, axis=1)
+        filled_rows = np.sum(non_zero_rows > 0)
+        print(f"Filled rows: {filled_rows}/{args.length}")
+        print(f"Empty rows: {args.length - filled_rows}")
+        
+        # Show shape for easy copying to other code
+        print(f"Usage: matrix = np.load('{args.output or 'matrix.npy'}')")
+        print(f"Shape: {matrix.shape} (dtype: {matrix.dtype})")
 
 if __name__ == '__main__':
     main() 
