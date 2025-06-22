@@ -1,0 +1,52 @@
+{
+  "duck": {
+    "VERB": {
+      "count": 7,
+      "relative": 0.7778
+    },
+    "NOUN": {
+      "count": 2,
+      "relative": 0.2222
+    }
+  },
+  "i": {
+    "PRON": {
+      "count": 5155,
+      "relative": 0.9983
+    },
+    "NOUN": {
+      "count": 8,
+      "relative": 0.0015
+    },
+    "X": {
+      "count": 1,
+      "relative": 0.0002
+    }
+  },
+  "ate": {
+    "VERB": {
+      "count": 16,
+      "relative": 1.0
+    }
+  },
+  "for": {
+    "ADP": {
+      "count": 9481,
+      "relative": 0.9992
+    },
+    "ADV": {
+      "count": 5,
+      "relative": 0.0005
+    },
+    "NOUN": {
+      "count": 3,
+      "relative": 0.0003
+    }
+  },
+  "dinner": {
+    "NOUN": {
+      "count": 91,
+      "relative": 1.0
+    }
+  }
+}
