@@ -9,7 +9,137 @@ spec = importlib.util.spec_from_file_location("prob_dist", os.path.join(os.path.
 prob_dist = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(prob_dist)
 get_pos_distribution = prob_dist.get_pos_distribution
-process_text_file_bulk = prob_dist.process_text_file_bulk
+process_text_file_bulk_efficient = prob_dist.process_text_file_bulk_efficient
+cleanup_checkpoint = prob_dist.cleanup_checkpoint
+
+# Import from prob-dist-mat.py (handle hyphen in filename)
+spec_mat = importlib.util.spec_from_file_location("prob_dist_mat", os.path.join(os.path.dirname(__file__), "prob-dist-mat.py"))
+prob_dist_mat = importlib.util.module_from_spec(spec_mat)
+spec_mat.loader.exec_module(prob_dist_mat)
+get_word_vector = prob_dist_mat.get_word_vector
+convert_pos_cache_to_matrix = prob_dist_mat.convert_pos_cache_to_matrix
+get_similar_words = prob_dist_mat.get_similar_words
+print_word_vector = prob_dist_mat.print_word_vector
+
+def analyze_sentence(text: str, output_file: str = None, raw: bool = False, format_type: str = 'table'):
+    """
+    Analyze a sentence and get POS vectors for each word.
+    
+    Args:
+        text: The sentence or text to analyze
+        output_file: Optional file to save results
+        raw: Whether to show raw vectors
+        format_type: Output format ('table', 'json', 'compact')
+    """
+    import nltk
+    import json
+    
+    # Tokenize the text
+    nltk.download('punkt', quiet=True)
+    tokens = nltk.word_tokenize(text)
+    
+    # Filter to only alphabetic tokens
+    words = [token.lower() for token in tokens if token.isalpha()]
+    
+    print(f"Analyzing sentence: \"{text}\"")
+    print(f"Found {len(words)} alphabetic words: {', '.join(words)}")
+    print()
+    
+    # Get vectors for each word
+    results = {}
+    for word in words:
+        vector = get_word_vector(word)
+        results[word] = vector
+    
+    # Output based on format
+    if format_type == 'table':
+        if raw:
+            print("Word           | Raw Vector")
+            print("---------------|" + "-" * 80)
+            for word, vector in results.items():
+                print(f"{word:14} | {vector}")
+        else:
+            # Show non-zero POS tags for each word
+            for word, vector in results.items():
+                print(f"'{word}':")
+                print("  Tag    | Probability")
+                print("  -------|------------")
+                for i, tag in enumerate(prob_dist_mat.UNIVERSAL_POS_TAGS):
+                    prob = vector[i]
+                    if prob > 0:
+                        print(f"  {tag:6} | {prob:.4f}")
+                print()
+    
+    elif format_type == 'json':
+        if raw:
+            json_output = results
+        else:
+            # Convert to POS distribution format
+            json_output = {}
+            for word, vector in results.items():
+                pos_dist = {}
+                for i, tag in enumerate(prob_dist_mat.UNIVERSAL_POS_TAGS):
+                    if vector[i] > 0:
+                        pos_dist[tag] = vector[i]
+                json_output[word] = pos_dist
+        
+        if output_file:
+            with open(output_file, 'w', encoding='utf-8') as f:
+                json.dump(json_output, f, indent=2, ensure_ascii=False)
+            print(f"Results saved to {output_file}")
+        else:
+            print(json.dumps(json_output, indent=2, ensure_ascii=False))
+    
+    elif format_type == 'compact':
+        for word, vector in results.items():
+            if raw:
+                print(f"{word}: {vector}")
+            else:
+                # Show only non-zero tags
+                active_tags = []
+                for i, tag in enumerate(prob_dist_mat.UNIVERSAL_POS_TAGS):
+                    if vector[i] > 0:
+                        active_tags.append(f"{tag}:{vector[i]:.3f}")
+                print(f"{word}: {', '.join(active_tags)}")
+    
+    elif format_type == 'matrix':
+        import numpy as np
+        
+        # Create matrix: n words x 16 POS dimensions
+        words_list = list(results.keys())
+        matrix = np.array([results[word] for word in words_list])
+        
+        print(f"Matrix shape: {len(words_list)} words × 16 POS dimensions")
+        print()
+        
+        # Print header with POS tags
+        print("Word".ljust(12), end=" ")
+        for tag in prob_dist_mat.UNIVERSAL_POS_TAGS:
+            print(f"{tag:>4}", end=" ")
+        print()
+        print("-" * 12 + " " + "-" * (5 * 16))
+        
+        # Print each word's vector as a row
+        for i, word in enumerate(words_list):
+            print(f"{word[:11]:<11}", end=" ")
+            for j, value in enumerate(matrix[i]):
+                # Format as .xx (remove leading 0 from 0.xx)
+                if value >= 1.0:
+                    formatted_value = f"{value:.2f}"  # Keep 1.00 format for values >= 1
+                else:
+                    formatted_value = f"{value:.2f}"[1:]  # Remove leading 0 for 0.xx -> .xx
+                
+                if value > 0.001:  # Non-zero values in normal color
+                    print(f"{formatted_value:>4}", end=" ")
+                else:  # Zero values in very dark grey (almost black)
+                    print(f"\033[2;30m{formatted_value:>4}\033[0m", end=" ")
+            print()
+    
+    if output_file and format_type != 'json':
+        # Save raw results to file for non-json formats
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump(results, f, indent=2, ensure_ascii=False)
+        print(f"Raw results also saved to {output_file}")
 
 def main():
     p = argparse.ArgumentParser(
@@ -23,22 +153,52 @@ def main():
     single_parser = subparsers.add_parser('word', help='Process a single word')
     single_parser.add_argument('word', help="The word to analyze (case-insensitive).")
     
-    # Bulk mode for text files
-    bulk_parser = subparsers.add_parser('bulk', help='Process all tokens from a text file')
+    # Bulk mode for text files (now with efficient processing)
+    bulk_parser = subparsers.add_parser('bulk', help='Process all tokens from a text file (efficient method)')
     bulk_parser.add_argument('input_file', help="Path to the input text file.")
     bulk_parser.add_argument('-o', '--output', help="Optional output JSON file path.")
     bulk_parser.add_argument('--print-summary', action='store_true', 
                            help="Print a summary of results to console.")
+    bulk_parser.add_argument('--no-resume', action='store_true',
+                           help="Don't resume from checkpoint, start fresh.")
+    bulk_parser.add_argument('--fast', action='store_true',
+                           help="Use faster but less accurate POS tagger.")
     
-    # If no subcommand provided, default to single word mode for backward compatibility
-    if len(sys.argv) == 2 and not sys.argv[1].startswith('-'):
-        # Assume it's a single word
-        args = argparse.Namespace(mode='word', word=sys.argv[1])
-    else:
-        args = p.parse_args()
-        if args.mode is None:
-            p.print_help()
-            return
+    # Checkpoint management
+    checkpoint_parser = subparsers.add_parser('checkpoint', help='Manage processing checkpoints')
+    checkpoint_parser.add_argument('action', choices=['clean'], help='Checkpoint action')
+    
+    # Matrix mode subcommands
+    # Convert mode - convert pos_cache.json to pos_mat_cache.json
+    convert_parser = subparsers.add_parser('convert', help='Convert POS cache to matrix format')
+    
+    # Vector mode - get vector for a single word
+    vector_parser = subparsers.add_parser('vector', help='Get POS vector for a word')
+    vector_parser.add_argument('word', help="The word to get vector for.")
+    vector_parser.add_argument('--raw', action='store_true', help="Output raw vector numbers.")
+    
+    # Similar mode - find words with similar POS distributions
+    similar_parser = subparsers.add_parser('similar', help='Find words with similar POS distributions')
+    similar_parser.add_argument('word', help="The target word.")
+    similar_parser.add_argument('-k', '--top-k', type=int, default=10, help="Number of similar words to return.")
+    
+    # Batch mode - get vectors for multiple words
+    batch_parser = subparsers.add_parser('batch', help='Get vectors for multiple words')
+    batch_parser.add_argument('words', nargs='+', help="Words to get vectors for.")
+    batch_parser.add_argument('--output', '-o', help="Save results to JSON file.")
+    
+    # Sentence mode - analyze a sentence and get vectors for each word
+    sentence_parser = subparsers.add_parser('sentence', help='Analyze a sentence and get vectors for each word')
+    sentence_parser.add_argument('text', help="The sentence or text to analyze.")
+    sentence_parser.add_argument('--output', '-o', help="Save results to JSON file.")
+    sentence_parser.add_argument('--raw', action='store_true', help="Output raw vector numbers.")
+    sentence_parser.add_argument('--format', choices=['table', 'json', 'compact', 'matrix'], default='table', 
+                               help="Output format (default: table).")
+    
+    args = p.parse_args()
+    if args.mode is None:
+        p.print_help()
+        return
 
     if args.mode == 'word':
         # Single word processing
@@ -51,8 +211,9 @@ def main():
                 print(f"  {tag:6} → {info['count']:5} times  ({info['relative']*100:.1f}%)")
     
     elif args.mode == 'bulk':
-        # Bulk text file processing
-        results = process_text_file_bulk(args.input_file, args.output)
+        # Efficient bulk text file processing
+        resume = not args.no_resume
+        results = process_text_file_bulk_efficient(args.input_file, args.output, resume=resume, fast=args.fast)
         
         if args.print_summary and results:
             print(f"\nSample results:")
@@ -66,6 +227,55 @@ def main():
                         print(f"  {tag:6} → {info['count']:5} times  ({info['relative']*100:.1f}%)")
                 else:
                     print(f"'{word}': No occurrences found")
+    
+    elif args.mode == 'checkpoint':
+        if args.action == 'clean':
+            cleanup_checkpoint()
+            print("Checkpoint cleaned.")
+    
+    elif args.mode == 'convert':
+        convert_pos_cache_to_matrix()
+    
+    elif args.mode == 'vector':
+        if args.raw:
+            vector = get_word_vector(args.word)
+            print(f"Vector for '{args.word}': {vector}")
+        else:
+            print_word_vector(args.word)
+    
+    elif args.mode == 'similar':
+        print(f"Finding words similar to '{args.word}'...")
+        similar_words = get_similar_words(args.word, args.top_k)
+        
+        if not similar_words:
+            print("No similar words found (make sure to run 'convert' first).")
+        else:
+            print(f"\nTop {len(similar_words)} words similar to '{args.word}':")
+            print("Word              | Similarity")
+            print("------------------|------------")
+            for word, similarity in similar_words:
+                print(f"{word:17} | {similarity:.4f}")
+    
+    elif args.mode == 'batch':
+        import json
+        results = {}
+        
+        print(f"Getting vectors for {len(args.words)} words...")
+        for word in args.words:
+            vector = get_word_vector(word)
+            results[word] = vector
+        
+        if args.output:
+            with open(args.output, 'w', encoding='utf-8') as f:
+                json.dump(results, f, indent=2, ensure_ascii=False)
+            print(f"Results saved to {args.output}")
+        else:
+            # Print results
+            for word, vector in results.items():
+                print(f"\n{word}: {vector}")
+    
+    elif args.mode == 'sentence':
+        analyze_sentence(args.text, args.output, args.raw, args.format)
 
 if __name__ == '__main__':
     main() 
