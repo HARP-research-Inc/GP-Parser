@@ -88650,5 +88650,11 @@
       "count": 2,
       "relative": 0.5
     }
+  },
+  "skipping": {
+    "VERB": {
+      "count": 4,
+      "relative": 1.0
+    }
   }
 }

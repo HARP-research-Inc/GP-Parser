@@ -3,3 +3,14 @@ numpy
 depccg
 holoviews
 networkx
+
+# Constituency parsing dependencies
+benepar
+spacy>=3.4.0
+matplotlib
+scipy
+scikit-learn
+
+# Additional data handling
+pandas
+tqdm

@@ -1,0 +1,6 @@
+# Minimal requirements for constituency parsing
+spacy>=3.4.0
+benepar
+matplotlib
+numpy
+tqdm 
