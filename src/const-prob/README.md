@@ -1,157 +1,95 @@
-# Constituency Tree Depth Analysis
+# Constituency Tree Distrobution Analysis Tool
 
-This module provides a high-accuracy constituency parser using the Berkeley Neural Parser (Benepar) to analyze the depth distribution of constituency trees in text datasets.
 
-## Features
+## Tree Labels
 
-- **High-Accuracy Parsing**: Uses Benepar, one of the most accurate constituency parsers available
-- **Tree Depth Analysis**: Calculates and analyzes the maximum depth of constituency trees
-- **Histogram Generation**: Creates visual histograms of tree depth distributions
-- **Large Dataset Support**: Efficiently processes large text datasets with progress tracking
-- **Flexible Input**: Works with sample data or custom text files
-- **Comprehensive Output**: Provides statistics, visualizations, and detailed JSON results
+| Label    | Category       | Description                                                |
+|----------|----------------|------------------------------------------------------------|
+| **S**      | Clause-level   | Simple declarative clause                                 |
+| **SBAR**   | Clause-level   | Clause introduced by a subordinating conjunction           |
+| **SBARQ**  | Clause-level   | Direct question introduced by a wh-word/phrase             |
+| **SINV**   | Clause-level   | Inverted declarative sentence (subject follows verb)       |
+| **SQ**     | Clause-level   | Inverted yes/no question or main clause of a wh-question   |
+| **ADJP**   | Phrase-level   | Adjective Phrase                                           |
+| **ADVP**   | Phrase-level   | Adverb Phrase                                              |
+| **CONJP**  | Phrase-level   | Conjunction Phrase                                         |
+| **FRAG**   | Phrase-level   | Fragment                                                   |
+| **INTJ**   | Phrase-level   | Interjection                                               |
+| **LST**    | Phrase-level   | List marker (with surrounding punctuation)                 |
+| **NAC**    | Phrase-level   | “Not a Constituent” (for certain prenominal modifiers)     |
+| **NP**     | Phrase-level   | Noun Phrase                                                |
+| **NX**     | Phrase-level   | N-bar head marker within complex NPs                       |
+| **PP**     | Phrase-level   | Prepositional Phrase                                       |
+| **PRN**    | Phrase-level   | Parenthetical Phrase                                       |
+| **PRT**    | Phrase-level   | Particle Phrase (RP in POS tags)                           |
+| **QP**     | Phrase-level   | Quantifier Phrase (e.g., complex measure/amount)           |
+| **RRC**    | Phrase-level   | Reduced Relative Clause                                    |
+| **UCP**    | Phrase-level   | Unlike Coordinated Phrase                                  |
+| **VP**     | Phrase-level   | Verb Phrase                                                |
+| **WHADJP** | Phrase-level   | Wh-adjective Phrase (e.g., “how hot”)                      |
+| **WHAVP**  | Phrase-level   | Wh-adverb Phrase (clause with an NP gap)                   |
+| **WHNP**   | Phrase-level   | Wh-noun Phrase (clause with an NP gap)                     |
+| **WHPP**   | Phrase-level   | Wh-prepositional Phrase (PP containing a WHNP)             |
+| **X**      | Phrase-level   | Unknown/uncertain/unbracketable                            |
 
-## Quick Start
+Source: ![https://surdeanu.cs.arizona.edu/mihai/teaching/ista555-fall13/readings/PennTreebankConstituents.html](https://surdeanu.cs.arizona.edu/mihai/teaching/ista555-fall13/readings/PennTreebankConstituents.html)
 
-### 1. Setup Environment
 
-First, run the setup script to install dependencies and download required models:
+## POS Tags
+| Tag   | Description                                       | Modifies                 |
+|-------|---------------------------------------------------|--------------------------|
+| CC    | Coordinating conjunction                          | — (connects same category) |
+| CD    | Cardinal number                                   | Noun                     |
+| DT    | Determiner                                        | Noun                     |
+| EX    | Existential there (“there is …”)                  | —                        |
+| FW    | Foreign word                                      | —                        |
+| IN    | Preposition or subordinating conjunction          | Noun (PP adjuncts)       |
+| JJ    | Adjective                                         | Noun                     |
+| JJR   | Adjective, comparative                            | Noun                     |
+| JJS   | Adjective, superlative                            | Noun                     |
+| LS    | List item marker                                  | —                        |
+| MD    | Modal auxiliary                                   | Verb                     |
+| NN    | Noun, singular or mass                            | —                        |
+| NNS   | Noun, plural                                      | —                        |
+| NNP   | Proper noun, singular                             | —                        |
+| NNPS  | Proper noun, plural                               | —                        |
+| PDT   | Predeterminer (e.g., “all the kids”)              | Noun                     |
+| POS   | Possessive ending (‘s)                            | Noun                     |
+| PRP   | Personal pronoun                                  | —                        |
+| PRP$  | Possessive pronoun                                | Noun                     |
+| RB    | Adverb                                            | Verb, Adj., Adv.         |
+| RBR   | Adverb, comparative                               | Verb, Adj., Adv.         |
+| RBS   | Adverb, superlative                               | Verb, Adj., Adv.         |
+| RP    | Particle (e.g., up, off)                          | Verb                     |
+| SYM   | Symbol                                            | —                        |
+| TO    | “to” (infinitival marker)                        | —                        |
+| UH    | Interjection (uh, um, etc.)                       | —                        |
+| VB    | Verb, base form                                   | —                        |
+| VBD   | Verb, past tense                                  | —                        |
+| VBG   | Verb, gerund or present participle                | —                        |
+| VBN   | Verb, past participle                             | —                        |
+| VBP   | Verb, non-3rd person singular present             | —                        |
+| VBZ   | Verb, 3rd person singular present                 | —                        |
+| WDT   | Wh-determiner (which, that)                       | Noun                     |
+| WP    | Wh-pronoun (who, what)                            | —                        |
+| WP$   | Possessive wh-pronoun (whose)                     | Noun                     |
+| WRB   | Wh-adverb (where, when)                           | Verb, Adj., Adv.         |
+| #     | Pound sign                                        | —                        |
+| $     | Dollar sign                                       | —                        |
+| “     | Left double quotation mark                        | —                        |
+| ”     | Right double quotation mark                       | —                        |
+| (     | Left parenthesis                                  | —                        |
+| )     | Right parenthesis                                 | —                        |
+| ,     | Comma                                             | —                        |
+| .     | Sentence-final punctuation                        | —                        |
+| :     | Mid-sentence colon or ellipsis                    | —                        |
 
-```bash
-python setup.py
-```
+### Mutually Exclusive Noun Modifiers
+| NP Slot             | Tags                                    | Mutual Exclusivity                |
+|---------------------|-----------------------------------------|-----------------------------------|
+| **Specifier**       | DT, WDT, PRP\$, WP\$                    | **Exactly one** of these per NP   |
+| **Pre-determiner**  | PDT                                     | **At most one** per NP            |
+| **Numeral**         | CD                                      | **At most one** per NP            |
+| **Adjective degree**| JJ, JJR, JJS                            | **Per token**, only one of these  |
+| **Possessive clitic**| POS                                    | **At most one** per NP            |
 
-This will:
-- Install all required Python packages
-- Download the spaCy English model
-- Prepare the environment for Benepar
-
-### 2. Run Analysis
-
-#### Using Sample Dataset
-```bash
-python main.py
-```
-
-#### Using Your Own Text File
-```bash
-python main.py --input-file path/to/your/textfile.txt
-```
-
-#### Limiting Sample Size
-```bash
-python main.py --sample-size 500
-```
-
-#### Custom Output Directory
-```bash
-python main.py --output-dir my_results
-```
-
-## Command Line Options
-
-- `--input-file`: Path to input text file (optional, uses sample data if not provided)
-- `--sample-size`: Maximum number of sentences to analyze (default: 1000)
-- `--output-dir`: Output directory for results (default: "output")
-- `--model`: spaCy model to use (default: "en_core_web_sm")
-
-## Output Files
-
-The script generates several output files:
-
-### 1. Histogram (`tree_depth_histogram.png`)
-Visual histogram showing the distribution of constituency tree depths with:
-- Frequency counts for each depth level
-- Statistics overlay (total sentences, mean depth)
-- Professional formatting
-
-### 2. Detailed Results (`constituency_analysis_results.json`)
-Comprehensive JSON file containing:
-- Individual parse results for each sentence
-- Depth count statistics
-- Performance metrics
-- Error information
-
-## Example Output
-
-```
-==================================================
-CONSTITUENCY TREE DEPTH ANALYSIS RESULTS
-==================================================
-Total sentences processed: 15
-Successful parses: 15
-Failed parses: 0
-Success rate: 100.00%
-Processing time: 12.34 seconds
-Mean tree depth: 8.73
-Median tree depth: 9.00
-Depth range: 6 - 12
-
-Depth distribution:
-  Depth 6: 1 sentences (6.7%)
-  Depth 7: 2 sentences (13.3%)
-  Depth 8: 4 sentences (26.7%)
-  Depth 9: 3 sentences (20.0%)
-  Depth 10: 3 sentences (20.0%)
-  Depth 11: 1 sentences (6.7%)
-  Depth 12: 1 sentences (6.7%)
-```
-
-## Understanding Tree Depth
-
-Constituency tree depth represents the maximum number of nested syntactic constituents in a sentence. For example:
-
-- **Shallow trees** (depth 4-6): Simple sentences with basic structure
-- **Medium trees** (depth 7-10): Complex sentences with embedded clauses
-- **Deep trees** (depth 11+): Highly complex sentences with multiple levels of embedding
-
-## Input File Format
-
-The script accepts plain text files with sentences. It automatically:
-- Splits text into sentences (using periods as delimiters)
-- Filters out very short sentences (less than 3 words)
-- Handles various text encodings (UTF-8)
-
-## Performance
-
-- **Processing Speed**: ~10-50 sentences per second (depending on hardware)
-- **Memory Usage**: Moderate (loads spaCy and Benepar models)
-- **Accuracy**: State-of-the-art constituency parsing accuracy
-
-## Large Dataset Recommendations
-
-For very large datasets:
-1. Use the `--sample-size` parameter to limit analysis
-2. Monitor progress with the built-in logging
-3. Consider running in chunks for datasets > 10,000 sentences
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Model Download Fails**: Ensure internet connection and run setup again
-2. **Memory Errors**: Reduce `--sample-size` for large datasets
-3. **Parsing Failures**: Check input text encoding and sentence structure
-
-### Requirements
-
-- Python 3.7+
-- Internet connection (for initial model downloads)
-- ~2GB RAM for model loading
-- ~1GB disk space for models
-
-## Technical Details
-
-### Parser Details
-- **Model**: Benepar (Berkeley Neural Parser)
-- **Backend**: spaCy pipeline integration
-- **Accuracy**: ~95% F1 score on standard benchmarks
-
-### Tree Depth Calculation
-The script recursively traverses constituency trees to find the maximum depth from root to any leaf node, providing insights into syntactic complexity.
-
-## Citation
-
-If you use this tool in research, please cite:
-- Benepar: Kitaev & Klein (2018)
-- spaCy: Honnibal & Montani (2017) 

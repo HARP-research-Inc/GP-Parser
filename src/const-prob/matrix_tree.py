@@ -63,7 +63,7 @@ def visualize_matrix(mat: np.ndarray, tokens: list, title: str):
     print(df)
 
 if __name__ == "__main__":
-    sentence = "The quick brown fox jumps over the lazy dog."
+    sentence = "The quick brown fox linguistically jumps over the lazy dog."
     tokens, mods, spans = parse_to_matrices(sentence)
 
     # Visualize modifier matrices
