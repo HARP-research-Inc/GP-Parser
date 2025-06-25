@@ -32,7 +32,7 @@ def load_models():
     # benepar.download('benepar_en3_large')
     # nlp = spacy.load("en_core_web_trf")
     # nlp.add_pipe("benepar", config={"model": "benepar_en3_large"})
-    
+
     end = time.time()
     loading_complete = True
     actual_time = end - start
@@ -71,31 +71,39 @@ class TreeTrix:
 
     def noun_phrases(self):
         noun_phrases = []
-        print("Noun phrases:")
         for s in self.tree.subtrees():
             if s.label() == "NP":
-                print("   ", " ".join(s.leaves()))
                 noun_phrases.append(s)
         return noun_phrases
     
+    def childz(self, t):
+        immediate_subtrees = [t[i] for i in range(len(t)) if isinstance(t[i], Tree)]
+        return immediate_subtrees
     
     def noun_phrases_to_layer_0(self):
         noun_phrases = self.noun_phrases
         
         t = self.tree
         for np in noun_phrases:
+            print("NP: Checking - ", " ".join(np.leaves()))
+            print(np)
             nouns = []
             modifiers = []
-            for s in np.subtrees(lambda t: t.height() == 2):
-                if s.label() == "NN":
+            nonmodifiers = []
+            ic = self.childz(np)
+            cands = [t for t in ic if t.height() == 2]
+            for s in ic:
+                if ("NN" in s.label()) or s.label() == "PRP" or s.label() == "WP":
                     nouns.append(s)
-                    print('Found noun "'+s.leaves()[0]+'" in '+'"'+" ".join(np.leaves())+'"')
-                if (s.label() == "ADJ") or (s.label() == "ART"):
-                    pass
+                    print('  Found static noun "'+s.leaves()[0]+'" in '+'"'+" ".join(np.leaves())+'"')
+                     
+                if (s.label() in ["WP$", "WDT", "PRP$", "POS", "PDT", "IN", "DT", "CD" ]) or ("JJ" in s.label()):
+                    modifiers.append(s)
+                    print('  Found noun modifer "'+s.leaves()[0]+'" of type '+s.label())
+                
+                if (s.label)
 
-
-
-        
+      
 def parse_to_matrices(sentence: str):
     doc = nlp(sentence)
     sent = list(doc.sents)[0]
@@ -103,26 +111,12 @@ def parse_to_matrices(sentence: str):
     tokens = tree.leaves()
     n = len(tokens)
 
-    print("Parse string:")
-    print(sent._.parse_string)
-
     print("Tokens:")
     print(tokens)
 
     print("Tree:")
     print(tree)
 
-    print("Leaves:")
-    print(tree.leaves())
-
-    print("First level subtrees (immediate children):")
-    for s in tree:
-       print("   Subtree:")
-       print("   ", s)
-       print("   Leaves:")
-       print("   ", s.leaves())
-       print("   Height:")
-       print("   ", s.height())
 
     tree_trix = TreeTrix(tree)
     tree_trix.noun_phrases_to_layer_0()
@@ -139,8 +133,8 @@ def visualize_matrix(mat: np.ndarray, tokens: list, title: str):
     print(df)
 
 if __name__ == "__main__":
-    sentence = "The quick brown fox linguistically jumps over the lazy dog."
-    parse_to_matrices(sentence)
+    # sentence = "The quick brown fox linguistically jumps over the lazy dog."
+    # parse_to_matrices(sentence)
     sentence2 = "John's dog lazily basked in his own greed."
     parse_to_matrices(sentence2)
 

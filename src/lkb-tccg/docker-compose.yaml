@@ -1,0 +1,16 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  lkb:
+    build: .
+    container_name: lkb_fos
+    tty: true
+    stdin_open: true
+    environment:
+      - DELPHINHOME=/delphin
+      - LD_LIBRARY_PATH=/delphin/lkb_fos/lib/linux.x86.64
+    # optionally mount your host dirs:
+    # volumes:
+    #   - ./delphin:/delphin
+    #   - ./tmp:/tmp
