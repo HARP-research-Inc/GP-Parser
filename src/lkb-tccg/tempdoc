@@ -1,3 +1,10 @@
+RUN cp /XALAN/xalan-j_2_7_2/xalan.jar lib/
+RUN cp /XALAN/xalan-j_2_7_2/serializer.jar lib/
 
+# For Ant JAR files, we can copy from the system installation
+RUN cp /usr/share/java/ant.jar lib/
+RUN cp /usr/share/java/ant-launcher.jar lib/
 
+RUN ls -la lib/
 
+RUN ant

@@ -57,9 +57,9 @@ RUN ant jar
 # install JOpt Simple
 RUN mkdir /JOPT
 WORKDIR /JOPT
-RUN wget https://github.com/jopt-simple/jopt-simple/archive/refs/tags/jopt-simple-4.6.tar.gz
-RUN tar -xzf jopt-simple-4.6.tar.gz
-WORKDIR /JOPT/jopt-simple-jopt-simple-4.6
+RUN wget https://github.com/jopt-simple/jopt-simple/archive/refs/tags/jopt-simple-4.3.tar.gz
+RUN tar -xzf jopt-simple-4.3.tar.gz
+WORKDIR /JOPT/jopt-simple-jopt-simple-4.3
 RUN mvn clean package -DskipTests
 
 # install JLine
@@ -70,14 +70,22 @@ RUN tar -xzf jline-1.0.tar.gz
 WORKDIR /JLINE/jline1-jline-1.0
 RUN mvn clean package -DskipTests
 
+# install Apache Xalan (for XML serializer)
+RUN mkdir /XALAN
+WORKDIR /XALAN
+RUN wget https://archive.apache.org/dist/xalan/xalan-j/binaries/xalan-j_2_7_1-bin-2jars.tar.gz
+RUN tar -xzf xalan-j_2_7_1-bin-2jars.tar.gz
+
 # Copy the built JAR files to OpenCCG's lib directory
 WORKDIR $OPENCCG_HOME
 
 RUN cp /JDOM/jdom/core/build/jdom-1.SNAPSHOT.jar lib/jdom.jar
 RUN cp /TROVE/trove-2.1.0/lib/trove-2.1.0.jar lib/trove.jar
 RUN cp /JGRAPHT/jgrapht-0.8.3/*.jar lib/jgrapht-jdk1.6.jar
-RUN cp /JOPT/jopt-simple-jopt-simple-4.6/target/jopt-simple-*.jar lib/jopt-simple.jar
+RUN cp /JOPT/jopt-simple-jopt-simple-4.3/target/jopt-simple-*.jar lib/jopt-simple.jar
 RUN cp /JLINE/jline1-jline-1.0/target/jline-*.jar lib/jline.jar
+RUN cp /XALAN/xalan-j_2_7_1/xalan.jar lib/
+RUN cp /XALAN/xalan-j_2_7_1/serializer.jar lib/
 
 # For Ant JAR files, we can copy from the system installation
 RUN cp /usr/share/java/ant.jar lib/
