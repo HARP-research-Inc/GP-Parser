@@ -1,16 +1,13 @@
-# docker-compose.yml
-version: '3.8'
-
 services:
-  lkb:
+  openccg:
     build: .
-    container_name: lkb_fos
+    container_name: openccg
     tty: true
     stdin_open: true
     environment:
-      - DELPHINHOME=/delphin
-      - LD_LIBRARY_PATH=/delphin/lkb_fos/lib/linux.x86.64
-    # optionally mount your host dirs:
+      - OPENCCG_HOME=/opt/openccg
+    # If you want the GUI later, uncomment and setup X11 forwarding:
     # volumes:
-    #   - ./delphin:/delphin
-    #   - ./tmp:/tmp
+    #   - /tmp/.X11-unix:/tmp/.X11-unix
+    # environment:
+    #   - DISPLAY=${DISPLAY}
